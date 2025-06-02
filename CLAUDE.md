@@ -132,3 +132,54 @@ async def your_method(self, resource_id: str, location_id: str):
         location_id=location_id  # This triggers location token usage
     )
 ```
+
+## Message System Implementation Guide
+
+### Critical: Message Type System
+The API uses different formats for sending vs reading messages:
+- **Sending messages**: Use string values `"SMS"`, `"Email"`, `"WhatsApp"`, `"IG"`, `"FB"`, `"Custom"`, `"Live_Chat"` in the `type` field
+- **Reading messages**: API returns:
+  - `type`: Numeric code (e.g., 1 for SMS, 2 for Email, 28 for activities)
+  - `messageType`: String with TYPE_ prefix (e.g., "TYPE_SMS", "TYPE_EMAIL", "TYPE_ACTIVITY_OPPORTUNITY")
+- **Model design**: Support both the sending format strings and reading format strings in enums
+
+### Email Message Structure
+Email messages require specific fields (NOT the generic "message" field):
+```json
+{
+  "type": "Email",
+  "conversationId": "...",
+  "contactId": "...",
+  "html": "<p>HTML content</p>",     // REQUIRED
+  "subject": "Email subject",        // REQUIRED  
+  "text": "Plain text version"       // OPTIONAL but recommended
+}
+```
+
+### SMS Message Structure
+```json
+{
+  "type": "SMS",
+  "conversationId": "...",
+  "contactId": "...",
+  "message": "SMS content",          // REQUIRED
+  "phone": "+1234567890"             // REQUIRED
+}
+```
+
+### Known API Response Patterns
+- **Conversations search endpoint**: `/conversations/search` (not `/conversations`)
+- **Messages response structure**: Nested as `data.messages.messages` 
+- **Send message response**: Returns `{conversationId, messageId}` only (not full message)
+- **Message body field**: Can be missing for activity/system messages
+- **Message status values**: Include non-standard values like `"voicemail"`
+
+### Common API Error Patterns
+- `"Missing phone number"` - Wrong field name or missing required field
+- `"There is no message or attachments"` - Wrong content field for message type
+- `"type must be a valid enum value"` - Using wrong string format for type
+
+### Field Naming Gotchas
+- Phone field: Sometimes `phone`, sometimes `phoneNumber`
+- Email content: Use `html` not `message`, `body`, or `content`
+- Always test with real API calls - documentation may not reflect actual requirements
