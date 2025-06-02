@@ -8,7 +8,11 @@
       "Bash(chmod:*)",
       "Bash(uv pip install:*)",
       "Bash(uv venv:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebFetch(domain:highlevel.stoplight.io)",
+      "Bash(python:*)",
+      "Bash(uv run:*)",
+      "Bash(grep:*)"
     ]
   },
   "enableAllProjectMcpServers": false

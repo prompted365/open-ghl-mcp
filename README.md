@@ -7,6 +7,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 - 🔐 **OAuth 2.0 Authentication**: Full OAuth flow with automatic token management
 - 🏢 **Multi-location Support**: Works with agency accounts to manage multiple locations
 - 👥 **Contact Management**: Complete CRUD operations for contacts
+- 💬 **Conversations**: Search conversations, view messages, and manage messaging
 - 🏷️ **Tag Management**: Add and remove tags from contacts
 - 🔄 **Automatic Token Refresh**: Handles token expiration seamlessly
 - 🛠️ **MCP Tools & Resources**: Both tools and resources for flexible integration
@@ -86,11 +87,24 @@ On first run, the server will:
 - `add_contact_tags` - Add tags to a contact
 - `remove_contact_tags` - Remove tags from a contact
 
+#### Conversation Management
+- `get_conversations` - Search and list conversations
+- `get_conversation` - Get a single conversation  
+- `get_messages` - Get messages from a conversation
+- `send_message` - Send messages (SMS ✅, Email ✅, WhatsApp, IG, FB, Custom, Live_Chat)
+- `update_message_status` - Update message delivery status
+
 #### Available Resources
 - `contacts://{location_id}` - List all contacts for a location
 - `contact://{location_id}/{contact_id}` - Get a single contact details
+- `conversations://{location_id}` - List all conversations for a location
+- `conversation://{location_id}/{conversation_id}` - Get conversation with messages
 
 ## Development
+
+### Testing
+
+For local testing with real GoHighLevel accounts, create a `TESTING_INSTRUCTIONS.md` file in the project root with your specific testing accounts and guidelines. This file is gitignored and should not be committed to the repository.
 
 ### Running Tests
 

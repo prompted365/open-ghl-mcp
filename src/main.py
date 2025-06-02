@@ -12,6 +12,10 @@ from pydantic import BaseModel, Field
 from .api.client import GoHighLevelClient
 from .services.oauth import OAuthService
 from .models.contact import Contact, ContactCreate, ContactUpdate
+from .models.conversation import (
+    Conversation, ConversationCreate, Message, MessageCreate,
+    MessageType, MessageStatus
+)
 
 
 # Initialize FastMCP server
@@ -101,6 +105,72 @@ class ManageTagsParams(BaseModel):
     contact_id: str = Field(..., description="The contact ID")
     location_id: str = Field(..., description="The location ID where the contact exists")
     tags: List[str] = Field(..., description="Tags to add or remove")
+    access_token: Optional[str] = Field(None, description="Optional access token to use instead of stored token")
+
+
+# Conversation Tool Models
+
+class GetConversationsParams(BaseModel):
+    """Parameters for getting conversations"""
+    location_id: str = Field(..., description="The location ID")
+    contact_id: Optional[str] = Field(None, description="Filter by contact ID")
+    starred: Optional[bool] = Field(None, description="Filter by starred status")
+    unread_only: Optional[bool] = Field(None, description="Only show unread conversations")
+    limit: int = Field(100, description="Number of results to return", ge=1, le=100)
+    skip: int = Field(0, description="Number of results to skip", ge=0)
+    access_token: Optional[str] = Field(None, description="Optional access token to use instead of stored token")
+
+
+class GetConversationParams(BaseModel):
+    """Parameters for getting a single conversation"""
+    conversation_id: str = Field(..., description="The conversation ID")
+    location_id: str = Field(..., description="The location ID")
+    access_token: Optional[str] = Field(None, description="Optional access token to use instead of stored token")
+
+
+class CreateConversationParams(BaseModel):
+    """Parameters for creating a conversation"""
+    location_id: str = Field(..., description="The location ID")
+    contact_id: str = Field(..., description="The contact ID")
+    message_type: Optional[str] = Field(None, description="Initial message type: SMS, Email, WhatsApp, IG, FB, Custom, Live_Chat")
+    access_token: Optional[str] = Field(None, description="Optional access token to use instead of stored token")
+
+
+class GetMessagesParams(BaseModel):
+    """Parameters for getting messages in a conversation"""
+    conversation_id: str = Field(..., description="The conversation ID")
+    location_id: str = Field(..., description="The location ID")
+    limit: int = Field(100, description="Number of results to return", ge=1, le=100)
+    skip: int = Field(0, description="Number of results to skip", ge=0)
+    access_token: Optional[str] = Field(None, description="Optional access token to use instead of stored token")
+
+
+class SendMessageParams(BaseModel):
+    """Parameters for sending a message"""
+    conversation_id: str = Field(..., description="The conversation ID")
+    location_id: str = Field(..., description="The location ID")
+    message_type: str = Field(..., description="Type of message to send: SMS, Email, WhatsApp, IG, FB, Custom, Live_Chat")
+    contact_id: str = Field(..., description="Contact ID to send message to")
+    
+    # SMS fields
+    message: Optional[str] = Field(None, description="Message content for SMS")
+    phone: Optional[str] = Field(None, description="Phone number for SMS messages")
+    
+    # Email fields  
+    html: Optional[str] = Field(None, description="HTML content for email messages")
+    text: Optional[str] = Field(None, description="Plain text content for email messages")
+    subject: Optional[str] = Field(None, description="Subject line for email messages")
+    
+    # General
+    attachments: Optional[List[Dict[str, Any]]] = Field(None, description="Optional attachments")
+    access_token: Optional[str] = Field(None, description="Optional access token to use instead of stored token")
+
+
+class UpdateMessageStatusParams(BaseModel):
+    """Parameters for updating message status"""
+    message_id: str = Field(..., description="The message ID")
+    location_id: str = Field(..., description="The location ID")
+    status: MessageStatus = Field(..., description="New status for the message")
     access_token: Optional[str] = Field(None, description="Optional access token to use instead of stored token")
 
 
@@ -243,6 +313,125 @@ async def remove_contact_tags(params: ManageTagsParams) -> Dict[str, Any]:
     }
 
 
+# Conversation Tools
+
+@mcp.tool()
+async def get_conversations(params: GetConversationsParams) -> Dict[str, Any]:
+    """Get conversations for a location"""
+    client = await get_client(params.access_token)
+    
+    result = await client.get_conversations(
+        location_id=params.location_id,
+        limit=params.limit,
+        skip=params.skip,
+        contact_id=params.contact_id,
+        starred=params.starred,
+        unread_only=params.unread_only
+    )
+    
+    return {
+        "success": True,
+        "conversations": [c.model_dump() for c in result.conversations],
+        "count": result.count,
+        "total": result.total
+    }
+
+
+@mcp.tool()
+async def get_conversation(params: GetConversationParams) -> Dict[str, Any]:
+    """Get a single conversation"""
+    client = await get_client(params.access_token)
+    
+    conversation = await client.get_conversation(params.conversation_id, params.location_id)
+    return {
+        "success": True,
+        "conversation": conversation.model_dump()
+    }
+
+
+@mcp.tool()
+async def create_conversation(params: CreateConversationParams) -> Dict[str, Any]:
+    """Create a new conversation"""
+    client = await get_client(params.access_token)
+    
+    conversation_data = ConversationCreate(
+        locationId=params.location_id,
+        contactId=params.contact_id,
+        lastMessageType=params.message_type
+    )
+    
+    conversation = await client.create_conversation(conversation_data)
+    return {
+        "success": True,
+        "conversation": conversation.model_dump()
+    }
+
+
+@mcp.tool()
+async def get_messages(params: GetMessagesParams) -> Dict[str, Any]:
+    """Get messages from a conversation"""
+    client = await get_client(params.access_token)
+    
+    result = await client.get_messages(
+        conversation_id=params.conversation_id,
+        location_id=params.location_id,
+        limit=params.limit,
+        skip=params.skip
+    )
+    
+    return {
+        "success": True,
+        "messages": [m.model_dump() for m in result.messages],
+        "count": result.count,
+        "total": result.total
+    }
+
+
+@mcp.tool()
+async def send_message(params: SendMessageParams) -> Dict[str, Any]:
+    """Send a message in a conversation"""
+    client = await get_client(params.access_token)
+    
+    message_data = MessageCreate(
+        type=params.message_type,
+        contactId=params.contact_id,
+        message=params.message,
+        phone=params.phone,
+        html=params.html,
+        text=params.text,
+        subject=params.subject,
+        attachments=params.attachments
+    )
+    
+    message = await client.send_message(
+        conversation_id=params.conversation_id,
+        message=message_data,
+        location_id=params.location_id
+    )
+    
+    return {
+        "success": True,
+        "message": message.model_dump()
+    }
+
+
+@mcp.tool()
+async def update_message_status(params: UpdateMessageStatusParams) -> Dict[str, Any]:
+    """Update the status of a message"""
+    client = await get_client(params.access_token)
+    
+    message = await client.update_message_status(
+        message_id=params.message_id,
+        status=params.status,
+        location_id=params.location_id
+    )
+    
+    return {
+        "success": True,
+        "message": message.model_dump()
+    }
+
+
 # Resources
 
 @mcp.resource("contacts://{location_id}")
@@ -306,6 +495,69 @@ async def get_contact_resource(location_id: str, contact_id: str) -> str:
         lines.append(f"**Added:** {contact.dateAdded}")
     if contact.lastActivity:
         lines.append(f"**Last Activity:** {contact.lastActivity}")
+    
+    return "\n".join(lines)
+
+
+@mcp.resource("conversations://{location_id}")
+async def list_conversations_resource(location_id: str) -> str:
+    """List all conversations for a location as a resource"""
+    result = await ghl_client.get_conversations(location_id=location_id, limit=100)
+    
+    # Format conversations as readable text
+    lines = [f"# Conversations for Location {location_id}\n"]
+    lines.append(f"Total conversations: {result.total or result.count}\n")
+    
+    for conv in result.conversations:
+        contact_name = conv.contactName or conv.fullName or "Unknown"
+        lines.append(f"\n## {contact_name}")
+        lines.append(f"- ID: {conv.id}")
+        lines.append(f"- Contact ID: {conv.contactId}")
+        if conv.lastMessageBody:
+            lines.append(f"- Last Message: {conv.lastMessageBody[:100]}...")
+        if conv.lastMessageType:
+            lines.append(f"- Last Message Type: {conv.lastMessageType}")
+        if conv.unreadCount > 0:
+            lines.append(f"- Unread: {conv.unreadCount}")
+        if conv.starred:
+            lines.append("- ⭐ Starred")
+    
+    return "\n".join(lines)
+
+
+@mcp.resource("conversation://{location_id}/{conversation_id}")
+async def get_conversation_resource(location_id: str, conversation_id: str) -> str:
+    """Get a single conversation as a resource"""
+    conversation = await ghl_client.get_conversation(conversation_id, location_id)
+    messages = await ghl_client.get_messages(conversation_id, location_id, limit=50)
+    
+    # Format conversation as readable text
+    contact_name = conversation.contactName or conversation.fullName or "Unknown"
+    lines = [f"# Conversation with {contact_name}\n"]
+    lines.append(f"**ID:** {conversation.id}")
+    lines.append(f"**Contact:** {conversation.contactId}")
+    lines.append(f"**Location:** {conversation.locationId}")
+    
+    if conversation.email:
+        lines.append(f"**Email:** {conversation.email}")
+    if conversation.phone:
+        lines.append(f"**Phone:** {conversation.phone}")
+    if conversation.unreadCount > 0:
+        lines.append(f"**Unread Messages:** {conversation.unreadCount}")
+    if conversation.starred:
+        lines.append("**Status:** ⭐ Starred")
+    
+    lines.append(f"\n## Messages ({messages.count} of {messages.total or messages.count})\n")
+    
+    for msg in messages.messages:
+        direction = "→ Sent" if msg.direction == "outbound" else "← Received"
+        lines.append(f"### {msg.dateAdded} {direction}")
+        lines.append(f"- Type: {msg.type}")
+        lines.append(f"- Status: {msg.status}")
+        lines.append(f"- Message: {msg.body}")
+        if msg.attachments:
+            lines.append(f"- Attachments: {len(msg.attachments)}")
+        lines.append("")
     
     return "\n".join(lines)
 
