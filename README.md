@@ -155,7 +155,7 @@ chmod +x .git/hooks/pre-commit
 
 The project uses GitHub Actions for CI/CD:
 - Tests run automatically on all pushes and pull requests
-- Supports Python 3.9, 3.10, 3.11, and 3.12
+- Tested with Python 3.12 and 3.13
 - Includes linting, type checking, and test coverage
 - Coverage reports are uploaded to Codecov (if configured)
 
