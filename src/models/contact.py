@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class ContactPhone(BaseModel):
     """Phone number for a contact"""
+
     phone: Optional[str] = None
     label: Optional[str] = None
     type: Optional[str] = None
@@ -12,12 +13,14 @@ class ContactPhone(BaseModel):
 
 class ContactEmail(BaseModel):
     """Email address for a contact"""
+
     email: Optional[str] = None
     label: Optional[str] = None
 
 
 class ContactAddress(BaseModel):
     """Address for a contact"""
+
     address1: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
@@ -27,6 +30,7 @@ class ContactAddress(BaseModel):
 
 class Contact(BaseModel):
     """GoHighLevel Contact model"""
+
     id: Optional[str] = None
     locationId: str
     firstName: Optional[str] = None
@@ -49,20 +53,21 @@ class Contact(BaseModel):
     dateAdded: Optional[datetime] = None
     dateUpdated: Optional[datetime] = None
     lastActivity: Optional[datetime] = None
-    
+
     # Additional fields from API
     companyName: Optional[str] = None
     assignedTo: Optional[str] = None
     followers: Optional[List[str]] = None
     additionalEmails: Optional[List[ContactEmail]] = None
     additionalPhones: Optional[List[ContactPhone]] = None
-    
+
     class Config:
         populate_by_name = True
 
 
 class ContactCreate(BaseModel):
     """Model for creating a contact"""
+
     locationId: str
     firstName: Optional[str] = None
     lastName: Optional[str] = None
@@ -80,10 +85,11 @@ class ContactCreate(BaseModel):
     source: Optional[str] = None
     customFields: Optional[List[Dict[str, Any]]] = None
     companyName: Optional[str] = None
-    
+
 
 class ContactUpdate(BaseModel):
     """Model for updating a contact"""
+
     firstName: Optional[str] = None
     lastName: Optional[str] = None
     name: Optional[str] = None
@@ -104,13 +110,15 @@ class ContactUpdate(BaseModel):
 
 class ContactList(BaseModel):
     """Response model for contact list"""
+
     contacts: List[Contact]
     count: int
     total: Optional[int] = None
-    
+
 
 class ContactSearchParams(BaseModel):
     """Parameters for searching contacts"""
+
     locationId: str
     query: Optional[str] = None
     limit: int = Field(default=100, ge=1, le=100)

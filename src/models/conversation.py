@@ -6,6 +6,7 @@ from enum import Enum
 
 class MessageType(str, Enum):
     """Message types supported by GoHighLevel API"""
+
     # API sending types (for outbound messages)
     SMS = "SMS"
     EMAIL = "Email"
@@ -14,7 +15,7 @@ class MessageType(str, Enum):
     FB = "FB"
     CUSTOM = "Custom"
     LIVE_CHAT = "Live_Chat"
-    
+
     # Legacy types (for reading existing messages)
     TYPE_CALL = "TYPE_CALL"
     TYPE_SMS = "TYPE_SMS"
@@ -39,7 +40,6 @@ MESSAGE_TYPE_CODES = {
     MessageType.FB: 7,
     MessageType.IG: 15,
     MessageType.LIVE_CHAT: 11,
-    
     # Legacy types (for compatibility)
     MessageType.TYPE_SMS: 1,
     MessageType.TYPE_EMAIL: 2,
@@ -55,6 +55,7 @@ MESSAGE_TYPE_CODES = {
 
 class MessageStatus(str, Enum):
     """Message delivery status"""
+
     SENT = "sent"
     DELIVERED = "delivered"
     READ = "read"
@@ -65,12 +66,14 @@ class MessageStatus(str, Enum):
 
 class MessageDirection(str, Enum):
     """Message direction"""
+
     INBOUND = "inbound"
     OUTBOUND = "outbound"
 
 
 class Message(BaseModel):
     """Message model"""
+
     id: str
     conversationId: str
     locationId: Optional[str] = None
@@ -79,7 +82,9 @@ class Message(BaseModel):
     type: Union[int, MessageType]  # API returns numeric type
     messageType: Optional[MessageType] = None  # String type
     direction: Optional[MessageDirection] = None
-    status: Optional[Union[MessageStatus, str]] = None  # Allow any string for flexibility
+    status: Optional[Union[MessageStatus, str]] = (
+        None  # Allow any string for flexibility
+    )
     dateAdded: Optional[datetime] = None
     dateUpdated: Optional[datetime] = None
     attachments: Optional[List[Dict[str, Any]]] = None
@@ -89,24 +94,30 @@ class Message(BaseModel):
 
 class MessageCreate(BaseModel):
     """Create a new message"""
-    type: Union[int, str, MessageType] = Field(..., description="Message type (numeric or string)")
+
+    type: Union[int, str, MessageType] = Field(
+        ..., description="Message type (numeric or string)"
+    )
     contactId: str = Field(..., description="Contact ID to send message to")
-    
+
     # SMS fields
     message: Optional[str] = Field(None, description="Message content for SMS")
     phone: Optional[str] = Field(None, description="Phone number for SMS messages")
-    
+
     # Email fields
     html: Optional[str] = Field(None, description="HTML content for email messages")
-    text: Optional[str] = Field(None, description="Plain text content for email messages")
+    text: Optional[str] = Field(
+        None, description="Plain text content for email messages"
+    )
     subject: Optional[str] = Field(None, description="Subject line for email messages")
-    
+
     # General
     attachments: Optional[List[Dict[str, Any]]] = None
 
 
 class Conversation(BaseModel):
     """Conversation model"""
+
     id: str
     locationId: str
     contactId: str
@@ -125,6 +136,7 @@ class Conversation(BaseModel):
 
 class ConversationCreate(BaseModel):
     """Create a new conversation"""
+
     locationId: str = Field(..., description="Location ID")
     contactId: str = Field(..., description="Contact ID")
     lastMessageType: Optional[MessageType] = None
@@ -132,6 +144,7 @@ class ConversationCreate(BaseModel):
 
 class ConversationList(BaseModel):
     """List of conversations"""
+
     conversations: List[Conversation]
     total: Optional[int] = None
     count: int
@@ -139,6 +152,7 @@ class ConversationList(BaseModel):
 
 class MessageList(BaseModel):
     """List of messages"""
+
     messages: List[Message]
     total: Optional[int] = None
     count: int

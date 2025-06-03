@@ -109,18 +109,54 @@ For local testing with real GoHighLevel accounts, create a `TESTING_INSTRUCTIONS
 ### Running Tests
 
 ```bash
-pytest
+# Run all tests
+uv run pytest
+
+# Run tests with coverage report
+uv run pytest --cov=src --cov-report=term-missing
+
+# Run specific test file
+uv run pytest tests/test_api_client.py -v
 ```
 
 ### Code Quality
 
-```bash
-# Linting
-flake8 src/ tests/
+This project uses automated code quality tools. Before committing changes:
 
-# Type checking
-mypy src/
+```bash
+# Format code with Black
+uv run black src/ tests/
+
+# Check linting with flake8
+uv run flake8 src/ tests/
+
+# Run type checking with mypy
+uv run mypy src/ --ignore-missing-imports
+
+# Run all checks at once
+uv run black src/ tests/ && uv run flake8 src/ tests/ && uv run mypy src/ --ignore-missing-imports
 ```
+
+### Pre-commit Hook (optional)
+
+To automatically format code before commits:
+
+```bash
+# Create a git pre-commit hook
+echo '#!/bin/sh
+uv run black src/ tests/
+uv run flake8 src/ tests/
+' > .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+### Continuous Integration
+
+The project uses GitHub Actions for CI/CD:
+- Tests run automatically on all pushes and pull requests
+- Supports Python 3.9, 3.10, 3.11, and 3.12
+- Includes linting, type checking, and test coverage
+- Coverage reports are uploaded to Codecov (if configured)
 
 ## Architecture
 

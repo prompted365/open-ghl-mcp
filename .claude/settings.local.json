@@ -12,7 +12,10 @@
       "WebFetch(domain:highlevel.stoplight.io)",
       "Bash(python:*)",
       "Bash(uv run:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(pytest:*)",
+      "Bash(uv pip list:*)",
+      "Bash(flake8:*)"
     ]
   },
   "enableAllProjectMcpServers": false

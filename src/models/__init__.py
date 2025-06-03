@@ -1,9 +1,15 @@
 from .auth import TokenResponse, StoredToken
 from .contact import Contact, ContactCreate, ContactUpdate, ContactList
 from .conversation import (
-    Conversation, ConversationCreate, ConversationList,
-    Message, MessageCreate, MessageList,
-    MessageType, MessageStatus, MessageDirection
+    Conversation,
+    ConversationCreate,
+    ConversationList,
+    Message,
+    MessageCreate,
+    MessageList,
+    MessageType,
+    MessageStatus,
+    MessageDirection,
 )
 
 __all__ = [
