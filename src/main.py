@@ -238,6 +238,7 @@ async def get_client(access_token: Optional[str] = None) -> GoHighLevelClient:
     if access_token:
         # Create a temporary client with the provided token
         temp_oauth = OAuthService()
+
         # Create an async function that returns the token
         async def return_token() -> str:
             return access_token
