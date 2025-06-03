@@ -15,7 +15,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.12+
 - GoHighLevel OAuth App credentials
 - `uv` package manager (or pip)
 
