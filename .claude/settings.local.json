@@ -15,7 +15,9 @@
       "Bash(grep:*)",
       "Bash(pytest:*)",
       "Bash(uv pip list:*)",
-      "Bash(flake8:*)"
+      "Bash(flake8:*)",
+      "Bash(mv:*)",
+      "Bash(cat:*)"
     ]
   },
   "enableAllProjectMcpServers": false

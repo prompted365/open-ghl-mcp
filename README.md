@@ -5,8 +5,9 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 
 ## Features
 
-- 🔐 **OAuth 2.0 Authentication**: Full OAuth flow with automatic token management
-- 🏢 **Multi-location Support**: Works with agency accounts to manage multiple locations
+- 🔐 **OAuth 2.0 Authentication**: Full OAuth flow with automatic token management by default
+- 🌟 **Custom Authentication**: Manual authentication with your own Marketplace App credentials available as an option
+- 🏢 **Multi-location Support**: Works with agency accounts to manage multiple sub-accounts
 - 👥 **Contact Management**: Complete CRUD operations for contacts
 - 💬 **Conversations**: Search conversations, view messages, and manage messaging
 - 🏷️ **Tag Management**: Add and remove tags from contacts
@@ -16,8 +17,10 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 ## Prerequisites
 
 - Python 3.12+
-- GoHighLevel OAuth App credentials
 - `uv` package manager (or pip)
+- One of the following:
+  - **Standard Mode Configuration**: Access via our hosted GoHighLevel app (recommended)
+  - **Custom Mode Configuration**: Your own GoHighLevel Marketplace App credentials
 
 ## Installation
 
@@ -26,39 +29,48 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 git clone https://github.com/yourusername/open-ghl-mcp.git
 cd open-ghl-mcp
 ```
-
-2. Create a virtual environment:
-```bash
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-```
-
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 uv pip install -r requirements.txt
 ```
 
-4. Set up environment variables:
+3. Start the server:
 ```bash
-cp .env.example .env
-# Edit .env with your GoHighLevel OAuth credentials
+python src/main.py
 ```
 
 ## Configuration
 
-Create a `.env` file with your GoHighLevel OAuth App credentials:
+This MCP server supports two authentication modes:
+
+### Option 1: Standard Mode (Recommended)
+
+Use our hosted GoHighLevel app without exposing credentials:
+
+1. Install our app from the GoHighLevel Marketplace
+2. Complete the OAuth flow to get your access key
+3. Return to this MCP server and paste your access key
+4. Configure your LLM to use the MCP server
+
+### Option 2: Custom Mode
+
+Use your own GoHighLevel Marketplace App:
+
+1. Create your own GoHighLevel Marketplace App
+2. Set the redirect URL to: `http://localhost:8080/oauth/callback`
+3. Configure your `.env` file:
 
 ```env
-# GoHighLevel OAuth Configuration
+AUTH_MODE=custom
 GHL_CLIENT_ID=your-client-id
 GHL_CLIENT_SECRET=your-client-secret
 ```
 
-## OAuth Setup
-
-1. Create an OAuth app in your GoHighLevel account
-2. Set the redirect URL to: `http://localhost:8080/oauth/callback`
-3. Copy your Client ID and Client Secret to the `.env` file
+4. Start the server:
+```bash
+python src/main.py
+```
+5. Configure your LLM to use the MCP server
 
 ## Usage
 
@@ -72,10 +84,13 @@ The server will start on port 8000 by default.
 
 ### First-time Authentication
 
-On first run, the server will:
-1. Open your browser for GoHighLevel authorization
-2. Ask you to select a location (sub-account)
-3. Store the tokens locally for future use
+#### Standard Mode
+1. The server will prompt you to install the Basic Machines Marketplace App
+2. Follow the provided link to complete OAuth through the Marketplace App
+3. Security Tokens are managed automatically by Basic Machines
+
+#### Custom Mode
+1. The server will read the .env file and use the credentials to authenticate with GoHighLevel
 
 ### Available MCP Tools
 
@@ -90,7 +105,7 @@ On first run, the server will:
 
 #### Conversation Management
 - `get_conversations` - Search and list conversations
-- `get_conversation` - Get a single conversation  
+- `get_conversation` - Get a single conversation
 - `get_messages` - Get messages from a conversation
 - `send_message` - Send messages (SMS ✅, Email ✅, WhatsApp, IG, FB, Custom, Live_Chat)
 - `update_message_status` - Update message delivery status
@@ -166,7 +181,7 @@ The server follows a modular architecture:
 - **OAuth Service**: Handles authentication and token management
 - **API Client**: Manages communication with GoHighLevel API
 - **MCP Server**: FastMCP-based server exposing tools and resources
-- **Models**: Pydantic models for data validation
+- **Data Models**: Pydantic models for data validation
 
 ## License
 

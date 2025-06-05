@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """GoHighLevel MCP Server using FastMCP"""
 
+import asyncio
+import os
+import sys
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 from fastmcp import FastMCP
@@ -8,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from .api.client import GoHighLevelClient
 from .services.oauth import OAuthService
+from .services.setup import StandardModeSetup
 from .models.contact import ContactCreate, ContactUpdate
 from .models.conversation import (
     ConversationCreate,
@@ -17,17 +22,62 @@ from .models.conversation import (
 )
 
 
+async def startup_check_and_setup() -> bool:
+    """Check authentication status and run setup if needed"""
+    print("🔧 Basic Machines -> GoHighLevel MCP Server")
+    print("   Version 0.1.0")
+
+    async with StandardModeSetup() as setup:
+        # Check current auth status
+        auth_valid, message = setup.check_auth_status()
+
+        if auth_valid:
+            # Validate existing config with API
+            print(f"✅ {message}")
+            print("🔍 Validating configuration with Basic Machines...")
+
+            config_valid = await setup.validate_existing_config()
+            if config_valid:
+                print("✅ Configuration validated successfully!")
+                return True
+            else:
+                print("⚠️  Configuration validation failed.")
+                print("   Your setup token may have expired or become invalid.\n")
+
+        else:
+            print(f"⚠️  {message}")
+
+        # Need to run setup
+        print("🚀 Starting Standard Mode setup wizard...\n")
+
+        setup_success = await setup.interactive_setup()
+
+        if not setup_success:
+            print("❌ Setup was not completed successfully.")
+            print("   The MCP server cannot start without valid authentication.")
+            print("   Please run the server again to retry setup.\n")
+            return False
+
+        return True
+
+
 # Initialize FastMCP server
 mcp: FastMCP = FastMCP(
     name="ghl-mcp-server",
     version="0.1.0",
-    description="MCP server for GoHighLevel API integration",
+    description="MCP server for GoHighLevel API v2 integration",
     dependencies=["httpx", "pydantic", "python-dotenv"],
 )
 
-# Global clients
-oauth_service: OAuthService = OAuthService()
-ghl_client: GoHighLevelClient = GoHighLevelClient(oauth_service)
+# Global clients - will be initialized after startup check
+oauth_service: Optional[OAuthService] = None
+ghl_client: Optional[GoHighLevelClient] = None
+
+def initialize_clients():
+    """Initialize OAuth service and GHL client after setup"""
+    global oauth_service, ghl_client
+    oauth_service = OAuthService()
+    ghl_client = GoHighLevelClient(oauth_service)
 
 
 # Tool Models
@@ -235,6 +285,10 @@ class UpdateMessageStatusParams(BaseModel):
 # Helper function to get client with optional token override
 async def get_client(access_token: Optional[str] = None) -> GoHighLevelClient:
     """Get GHL client with optional token override"""
+    # Ensure clients are initialized
+    if oauth_service is None or ghl_client is None:
+        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
+
     if access_token:
         # Create a temporary client with the provided token
         temp_oauth = OAuthService()
@@ -490,6 +544,8 @@ async def update_message_status(params: UpdateMessageStatusParams) -> Dict[str, 
 @mcp.resource("contacts://{location_id}")
 async def list_contacts_resource(location_id: str) -> str:
     """List all contacts for a location as a resource"""
+    if ghl_client is None:
+        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
     result = await ghl_client.get_contacts(location_id=location_id, limit=100)
 
     # Format contacts as readable text
@@ -519,6 +575,8 @@ async def list_contacts_resource(location_id: str) -> str:
 @mcp.resource("contact://{location_id}/{contact_id}")
 async def get_contact_resource(location_id: str, contact_id: str) -> str:
     """Get a single contact as a resource"""
+    if ghl_client is None:
+        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
     contact = await ghl_client.get_contact(contact_id, location_id)
 
     # Format contact as readable text
@@ -563,6 +621,8 @@ async def get_contact_resource(location_id: str, contact_id: str) -> str:
 @mcp.resource("conversations://{location_id}")
 async def list_conversations_resource(location_id: str) -> str:
     """List all conversations for a location as a resource"""
+    if ghl_client is None:
+        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
     result = await ghl_client.get_conversations(location_id=location_id, limit=100)
 
     # Format conversations as readable text
@@ -589,6 +649,8 @@ async def list_conversations_resource(location_id: str) -> str:
 @mcp.resource("conversation://{location_id}/{conversation_id}")
 async def get_conversation_resource(location_id: str, conversation_id: str) -> str:
     """Get a single conversation as a resource"""
+    if ghl_client is None:
+        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
     conversation = await ghl_client.get_conversation(conversation_id, location_id)
     messages = await ghl_client.get_messages(conversation_id, location_id, limit=50)
 
@@ -625,8 +687,27 @@ async def get_conversation_resource(location_id: str, conversation_id: str) -> s
     return "\n".join(lines)
 
 
+async def main():
+    """Main function with startup check and setup"""
+    # Run startup check and setup if needed
+    setup_success = await startup_check_and_setup()
+
+    if not setup_success:
+        print("🛑 Server startup failed due to setup failure.")
+        sys.exit(1)
+
+    # Initialize clients after successful setup
+    initialize_clients()
+
+    print("🚀 Starting MCP server...")
+    print("   Ready to receive requests from your LLM!")
+    print("   Press Ctrl+C to stop the server.\n")
+
+    # Start the FastMCP server
+    import uvicorn
+    uvicorn.run("src.main:mcp", host="0.0.0.0", port=8000, lifespan="on", reload=False)
+
+
 # Run the server
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("src.main:mcp", host="0.0.0.0", port=8000, lifespan="on", reload=True)
+    asyncio.run(main())

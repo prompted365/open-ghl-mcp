@@ -3,30 +3,111 @@ import json
 import secrets
 import webbrowser
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Literal
 from urllib.parse import urlencode, parse_qs
 from datetime import datetime, timedelta
+from enum import Enum
 
 import httpx
 from aiofiles import open as aio_open
 from pydantic_settings import BaseSettings
+from pydantic import Field, ConfigDict
 
 from ..models.auth import TokenResponse, StoredToken
+
+
+class AuthMode(str, Enum):
+    STANDARD = "standard"
+    CUSTOM = "custom"
 
 
 class OAuthSettings(BaseSettings):
     """OAuth configuration from environment"""
 
+    # Auth mode selection
+    auth_mode: AuthMode = Field(default=AuthMode.STANDARD)
+
+    # Standard mode settings
+    supabase_url: Optional[str] = Field(None)
+    supabase_access_key: Optional[str] = Field(None)
+    marketplace_app_id: str = Field(default="ghl-mcp-server")
+
+    # Custom mode settings
     ghl_base_url: str = "https://marketplace.gohighlevel.com"
     ghl_api_url: str = "https://services.leadconnectorhq.com"
-    ghl_client_id: str
-    ghl_client_secret: str
+    ghl_client_id: Optional[str] = Field(None)
+    ghl_client_secret: Optional[str] = Field(None)
     oauth_redirect_uri: str = "http://localhost:8080/oauth/callback"
     oauth_server_port: int = 8080
     token_storage_path: str = "./config/tokens.json"
 
-    class Config:
-        env_file = ".env"
+    model_config = ConfigDict(env_file=".env")
+
+    def model_post_init(self, __context):
+        """Validate required fields based on auth mode"""
+        if self.auth_mode == AuthMode.STANDARD:
+            if not self.supabase_url or not self.supabase_access_key:
+                raise ValueError(
+                    "SUPABASE_URL and SUPABASE_ACCESS_KEY are required for standard mode"
+                )
+        elif self.auth_mode == AuthMode.CUSTOM:
+            if not self.ghl_client_id or not self.ghl_client_secret:
+                raise ValueError(
+                    "GHL_CLIENT_ID and GHL_CLIENT_SECRET are required for custom mode"
+                )
+
+
+class StandardAuthService:
+    """Handles authentication through Supabase proxy"""
+
+    def __init__(self, settings: OAuthSettings):
+        self.settings = settings
+        self.client = httpx.AsyncClient()
+        self._token_cache: Dict[str, Dict] = {}
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.client.aclose()
+
+    async def get_location_token(self, location_id: str) -> str:
+        """Get token from Supabase"""
+        # Check cache
+        if location_id in self._token_cache:
+            cached = self._token_cache[location_id]
+            expires_at = datetime.fromisoformat(cached["expires_at"])
+            if expires_at > datetime.now():
+                return cached["access_token"]
+
+        # Fetch from Supabase
+        response = await self.client.post(
+            f"{self.settings.supabase_url}/functions/v1/get-token",
+            headers={
+                "Authorization": f"Bearer {self.settings.supabase_access_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "location_id": location_id,
+                "marketplace_app_id": self.settings.marketplace_app_id,
+            }
+        )
+
+        if response.status_code == 404:
+            # Token not found, need to authenticate
+            print("\nNo token found for this location. Please authenticate:")
+            print(f"1. Visit: {self.settings.supabase_url}/auth/login")
+            print(f"2. After login, visit the OAuth initiation endpoint")
+            print(f"3. Complete the GoHighLevel authorization flow")
+            raise Exception("Authentication required. Please complete the OAuth flow.")
+
+        response.raise_for_status()
+        token_data = response.json()
+
+        # Cache the token
+        self._token_cache[location_id] = token_data
+
+        return token_data["access_token"]
 
 
 class OAuthService:
@@ -51,14 +132,27 @@ class OAuthService:
         self._auth_code_future = None
         self._location_tokens: Dict[str, StoredToken] = {}  # Cache for location tokens
 
+        # Initialize standard auth service if in standard mode
+        if self.settings.auth_mode == AuthMode.STANDARD:
+            self._standard_auth = StandardAuthService(self.settings)
+        else:
+            self._standard_auth = None
+
     async def __aenter__(self):
+        if self._standard_auth:
+            await self._standard_auth.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
+        if self._standard_auth:
+            await self._standard_auth.__aexit__(exc_type, exc_val, exc_tb)
 
     async def load_token(self) -> Optional[StoredToken]:
-        """Load token from storage"""
+        """Load token from storage (self-hosted mode only)"""
+        if self.settings.auth_mode == AuthMode.STANDARD:
+            return None
+
         token_path = Path(self.settings.token_storage_path)
         if not token_path.exists():
             return None
@@ -72,7 +166,10 @@ class OAuthService:
             return None
 
     async def save_token(self, token: StoredToken) -> None:
-        """Save token to storage"""
+        """Save token to storage (self-hosted mode only)"""
+        if self.settings.auth_mode == AuthMode.STANDARD:
+            return
+
         token_path = Path(self.settings.token_storage_path)
         token_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -81,6 +178,12 @@ class OAuthService:
 
     async def get_valid_token(self) -> str:
         """Get a valid access token, refreshing if necessary"""
+        if self.settings.auth_mode == AuthMode.STANDARD:
+            raise Exception(
+                "In standard mode, use get_location_token directly. "
+                "Agency tokens are managed by the proxy."
+            )
+
         token = await self.load_token()
 
         if not token:
@@ -93,7 +196,10 @@ class OAuthService:
         return token.access_token
 
     async def authenticate(self) -> StoredToken:
-        """Run the full OAuth authentication flow"""
+        """Run the full OAuth authentication flow (custom mode only)"""
+        if self.settings.auth_mode == AuthMode.STANDARD:
+            raise Exception("Custom authentication not available in standard mode")
+
         state = secrets.token_urlsafe(32)
 
         # Build authorization URL with all scopes
@@ -134,7 +240,10 @@ class OAuthService:
         return stored_token
 
     async def refresh_token(self, refresh_token: str) -> StoredToken:
-        """Refresh an expired token"""
+        """Refresh an expired token (custom mode only)"""
+        if self.settings.auth_mode == AuthMode.STANDARD:
+            raise Exception("Token refresh is handled automatically in standard mode")
+
         token_data = {
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
@@ -244,7 +353,12 @@ class OAuthService:
     async def get_location_token(
         self, location_id: str, force_refresh: bool = False
     ) -> str:
-        """Get location-specific access token from agency token"""
+        """Get location-specific access token"""
+        # Use standard auth if available
+        if self.settings.auth_mode == AuthMode.STANDARD:
+            return await self._standard_auth.get_location_token(location_id)
+
+        # Custom mode logic
         # Check cache first
         if not force_refresh and location_id in self._location_tokens:
             cached_token = self._location_tokens[location_id]

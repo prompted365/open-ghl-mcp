@@ -9,8 +9,7 @@ This is a Model Context Protocol (MCP) server for the GoHighLevel 2.0 API using 
 ## GoHighLevel API Documentation
 The official API docs are at https://highlevel.stoplight.io/docs/integrations/.
 
-Always use the official API docs at https://highlevel.stoplight.io/docs/integrations/ to understand the API and prefer
-this resource over any other documentation.
+Always use the official API docs at https://highlevel.stoplight.io/docs/integrations/ to understand the API and prefer this resource over any other documentation.
 
 Only use API v2. Do not use API v1 or refer to API v1 documentation.
 
@@ -48,10 +47,13 @@ python src/main.py
 The MCP server follows a modular architecture:
 
 1. **OAuth Service** (`src/services/oauth.py`):
+   - Dual-mode authentication: standard
+   - Single-mode authentication: custom
    - Handles OAuth 2.0 flow with GoHighLevel
    - Manages agency and location token exchange
    - Automatic token refresh and caching
-   - Browser-based authorization flow
+   - Browser-based authorization flow (standard mode)
+   - Manual authentication (custom mode)
    - Each endpoint follows the same pattern requiring location tokens for access
 
 2. **API Client** (`src/api/client.py`):
@@ -73,10 +75,16 @@ The MCP server follows a modular architecture:
 ## Key Implementation Details
 
 ### Authentication Flow
-1. Agency-level OAuth provides company access
-2. Location tokens are obtained for specific sub-accounts
-3. Contact operations require location-specific tokens
-4. Tokens are cached and refreshed automatically
+
+#### Standard Mode (Default)
+1. User authenticates through Basic Machines Marketplace App
+2. Basic Machines handles OAuth for this MCP server
+
+#### Custom Mode
+1. User creates their own Marketplace App and credentials
+2. User creates a .env file with their credentials
+3. User runs the MCP server with the .env file
+4. User can use the MCP server with their own credentials
 
 ### API Quirks
 - Location token endpoint returns 201 (not 200)
@@ -151,7 +159,7 @@ Email messages require specific fields (NOT the generic "message" field):
   "conversationId": "...",
   "contactId": "...",
   "html": "<p>HTML content</p>",     // REQUIRED
-  "subject": "Email subject",        // REQUIRED  
+  "subject": "Email subject",        // REQUIRED
   "text": "Plain text version"       // OPTIONAL but recommended
 }
 ```
@@ -169,7 +177,7 @@ Email messages require specific fields (NOT the generic "message" field):
 
 ### Known API Response Patterns
 - **Conversations search endpoint**: `/conversations/search` (not `/conversations`)
-- **Messages response structure**: Nested as `data.messages.messages` 
+- **Messages response structure**: Nested as `data.messages.messages`
 - **Send message response**: Returns `{conversationId, messageId}` only (not full message)
 - **Message body field**: Can be missing for activity/system messages
 - **Message status values**: Include non-standard values like `"voicemail"`
@@ -183,3 +191,6 @@ Email messages require specific fields (NOT the generic "message" field):
 - Phone field: Sometimes `phone`, sometimes `phoneNumber`
 - Email content: Use `html` not `message`, `body`, or `content`
 - Always test with real API calls - documentation may not reflect actual requirements
+
+### Documentation Gotchas
+- The API docs are not always accurate, but should be used as a starting point.
