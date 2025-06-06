@@ -39,7 +39,7 @@ flake8 src/ tests/
 mypy src/
 
 # Start the MCP server
-python src/main.py
+python -m src.main
 ```
 
 ## Architecture

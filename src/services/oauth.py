@@ -24,11 +24,11 @@ class AuthMode(str, Enum):
 class OAuthSettings(BaseSettings):
     """OAuth configuration from environment"""
 
-    # Auth mode selection
+    # Auth mode selection  
     auth_mode: AuthMode = Field(default=AuthMode.STANDARD)
 
-    # Standard mode settings
-    supabase_url: Optional[str] = Field(None)
+    # Standard mode settings (hardcoded for Basic Machines infrastructure)
+    supabase_url: str = Field(default="https://egigkzfowimxfavnjvpe.supabase.co")
     supabase_access_key: Optional[str] = Field(None)
     marketplace_app_id: str = Field(default="ghl-mcp-server")
 
@@ -41,16 +41,11 @@ class OAuthSettings(BaseSettings):
     oauth_server_port: int = 8080
     token_storage_path: str = "./config/tokens.json"
 
-    model_config = ConfigDict(env_file=".env")
+    model_config = ConfigDict(env_file=".env", extra="ignore")
 
     def model_post_init(self, __context):
         """Validate required fields based on auth mode"""
-        if self.auth_mode == AuthMode.STANDARD:
-            if not self.supabase_url or not self.supabase_access_key:
-                raise ValueError(
-                    "SUPABASE_URL and SUPABASE_ACCESS_KEY are required for standard mode"
-                )
-        elif self.auth_mode == AuthMode.CUSTOM:
+        if self.auth_mode == AuthMode.CUSTOM:
             if not self.ghl_client_id or not self.ghl_client_secret:
                 raise ValueError(
                     "GHL_CLIENT_ID and GHL_CLIENT_SECRET are required for custom mode"
@@ -63,7 +58,23 @@ class StandardAuthService:
     def __init__(self, settings: OAuthSettings):
         self.settings = settings
         self.client = httpx.AsyncClient()
-        self._token_cache: Dict[str, Dict] = {}
+        self._company_token_cache: Optional[Dict] = None
+        self._location_token_cache: Dict[str, Dict] = {}
+        self._load_setup_token()
+
+    def _load_setup_token(self):
+        """Load setup token from config file for standard mode"""
+        base_dir = Path(__file__).parent.parent.parent  # Goes up to project root
+        config_file = base_dir / "config" / "standard_config.json"
+        if config_file.exists():
+            try:
+                with open(config_file, 'r') as f:
+                    config_data = json.load(f)
+                token = config_data.get('setup_token')
+                if token:
+                    self.settings.supabase_access_key = token
+            except Exception:
+                pass  # Will be handled by validation later
 
     async def __aenter__(self):
         return self
@@ -71,16 +82,18 @@ class StandardAuthService:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
 
-    async def get_location_token(self, location_id: str) -> str:
-        """Get token from Supabase"""
+    async def get_company_token(self) -> str:
+        """Get company token from Supabase"""
         # Check cache
-        if location_id in self._token_cache:
-            cached = self._token_cache[location_id]
-            expires_at = datetime.fromisoformat(cached["expires_at"])
+        if self._company_token_cache:
+            expires_at = datetime.fromisoformat(self._company_token_cache["expires_at"])
+            # Remove timezone info for comparison if present
+            if expires_at.tzinfo is not None:
+                expires_at = expires_at.replace(tzinfo=None)
             if expires_at > datetime.now():
-                return cached["access_token"]
+                return self._company_token_cache["access_token"]
 
-        # Fetch from Supabase
+        # Fetch from Supabase (any location_id works since we want the company token)
         response = await self.client.post(
             f"{self.settings.supabase_url}/functions/v1/get-token",
             headers={
@@ -88,14 +101,14 @@ class StandardAuthService:
                 "Content-Type": "application/json",
             },
             json={
-                "location_id": location_id,
+                "location_id": "any",  # We just need any location to get the company token
                 "marketplace_app_id": self.settings.marketplace_app_id,
             }
         )
 
         if response.status_code == 404:
             # Token not found, need to authenticate
-            print("\nNo token found for this location. Please authenticate:")
+            print("\nNo token found. Please authenticate:")
             print(f"1. Visit: {self.settings.supabase_url}/auth/login")
             print(f"2. After login, visit the OAuth initiation endpoint")
             print(f"3. Complete the GoHighLevel authorization flow")
@@ -104,10 +117,94 @@ class StandardAuthService:
         response.raise_for_status()
         token_data = response.json()
 
-        # Cache the token
-        self._token_cache[location_id] = token_data
+        # Cache the company token
+        self._company_token_cache = token_data
 
         return token_data["access_token"]
+
+    async def _exchange_company_for_location_token(self, company_token: str, company_id: str, location_id: str) -> str:
+        """Exchange a company token for a location-specific token"""
+        print(f"Exchanging company token for location token (location: {location_id})")
+        
+        response = await self.client.post(
+            "https://services.leadconnectorhq.com/oauth/locationToken",
+            headers={
+                "Authorization": f"Bearer {company_token}",
+                "Version": "2021-07-28",
+                "Content-Type": "application/json"
+            },
+            json={
+                "companyId": company_id,
+                "locationId": location_id
+            }
+        )
+
+        if response.status_code not in [200, 201]:
+            error_text = response.text
+            print(f"Location token exchange failed: {response.status_code} - {error_text}")
+            raise Exception(f"Failed to exchange company token for location token: {response.status_code}")
+
+        token_data = response.json()
+        location_token = token_data.get('access_token')
+        
+        if not location_token:
+            raise Exception("Location token exchange succeeded but no access_token returned")
+            
+        print(f"Successfully obtained location token for {location_id}")
+        return location_token
+
+    async def get_location_token(self, location_id: str) -> str:
+        """Get location-specific token, exchanging company token if necessary"""
+        # Check cache
+        if location_id in self._location_token_cache:
+            cached = self._location_token_cache[location_id]
+            expires_at = datetime.fromisoformat(cached["expires_at"])
+            # Remove timezone info for comparison if present
+            if expires_at.tzinfo is not None:
+                expires_at = expires_at.replace(tzinfo=None)
+            if expires_at > datetime.now():
+                return cached["access_token"]
+
+        # Get company token first
+        company_token = await self.get_company_token()
+        
+        # Parse company token to get company ID
+        import base64
+        import json as json_module
+        try:
+            # Split JWT and decode payload (without signature verification)
+            parts = company_token.split('.')
+            if len(parts) >= 2:
+                # Add padding if needed
+                payload = parts[1]
+                payload += '=' * (4 - len(payload) % 4)
+                decoded_payload = base64.urlsafe_b64decode(payload)
+                jwt_data = json_module.loads(decoded_payload)
+                
+                company_id = jwt_data.get('authClassId')
+                if not company_id:
+                    raise Exception("Could not extract company ID from token")
+                    
+        except Exception as e:
+            raise Exception(f"Failed to parse company token: {e}")
+
+        # Exchange company token for location token
+        location_token = await self._exchange_company_for_location_token(
+            company_token, company_id, location_id
+        )
+        
+        # Cache the location token with a reasonable expiration
+        # Location tokens typically expire in 1 hour
+        expires_at = datetime.now() + timedelta(hours=1)
+        location_token_data = {
+            "access_token": location_token,
+            "expires_at": expires_at.isoformat(),
+            "location_id": location_id
+        }
+        
+        self._location_token_cache[location_id] = location_token_data
+
+        return location_token
 
 
 class OAuthService:
@@ -176,11 +273,21 @@ class OAuthService:
         async with aio_open(token_path, "w") as f:
             await f.write(token.model_dump_json(indent=2))
 
+    async def get_company_token(self) -> str:
+        """Get a valid company token"""
+        if self.settings.auth_mode == AuthMode.STANDARD:
+            if not self._standard_auth:
+                raise Exception("Standard auth service not initialized")
+            return await self._standard_auth.get_company_token()
+        else:
+            # In custom mode, return the agency token
+            return await self.get_valid_token()
+
     async def get_valid_token(self) -> str:
         """Get a valid access token, refreshing if necessary"""
         if self.settings.auth_mode == AuthMode.STANDARD:
             raise Exception(
-                "In standard mode, use get_location_token directly. "
+                "In standard mode, use get_company_token or get_location_token. "
                 "Agency tokens are managed by the proxy."
             )
 

@@ -6,7 +6,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 ## Features
 
 - 🔐 **OAuth 2.0 Authentication**: Full OAuth flow with automatic token management by default
-- 🌟 **Custom Authentication**: Manual authentication with your own Marketplace App credentials available as an option
+- 🌟 **Custom Authentication**: Manual authentication with your own Marketplace App credentials available
 - 🏢 **Multi-location Support**: Works with agency accounts to manage multiple sub-accounts
 - 👥 **Contact Management**: Complete CRUD operations for contacts
 - 💬 **Conversations**: Search conversations, view messages, and manage messaging
@@ -31,12 +31,14 @@ cd open-ghl-mcp
 ```
 2. Install dependencies:
 ```bash
+uv venv
+source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
 3. Start the server:
 ```bash
-python src/main.py
+python -m src.main
 ```
 
 ## Configuration
@@ -45,12 +47,14 @@ This MCP server supports two authentication modes:
 
 ### Option 1: Standard Mode (Recommended)
 
-Use our hosted GoHighLevel app without exposing credentials:
+Use our hosted GoHighLevel app with zero configuration:
 
-1. Install our app from the GoHighLevel Marketplace
-2. Complete the OAuth flow to get your access key
-3. Return to this MCP server and paste your access key
+1. Run the MCP server
+2. Follow the setup wizard to install our app
+3. Complete the OAuth flow
 4. Configure your LLM to use the MCP server
+
+*No .env file or manual configuration required.*
 
 ### Option 2: Custom Mode
 
@@ -66,21 +70,16 @@ GHL_CLIENT_ID=your-client-id
 GHL_CLIENT_SECRET=your-client-secret
 ```
 
-4. Start the server:
-```bash
-python src/main.py
-```
-5. Configure your LLM to use the MCP server
-
 ## Usage
 
 ### Running the MCP Server
 
+1. Start the server:
 ```bash
-python src/main.py
+python -m src.main
 ```
 
-The server will start on port 8000 by default.
+2. Configure your LLM to use the MCP server
 
 ### First-time Authentication
 

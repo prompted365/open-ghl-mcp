@@ -2,6 +2,7 @@
 Standard Mode Setup Wizard for GoHighLevel MCP Server
 """
 
+import json
 import os
 import webbrowser
 from pathlib import Path
@@ -24,8 +25,10 @@ class StandardModeSetup:
     """Handles Standard Mode setup wizard"""
 
     def __init__(self):
-        self.config_dir = Path("./config")
-        self.env_file = Path(".env")
+        # Use absolute path based on the module location
+        base_dir = Path(__file__).parent.parent.parent  # Goes up to project root
+        self.config_dir = base_dir / "config"
+        self.env_file = base_dir / ".env"
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def __aenter__(self):
@@ -34,28 +37,47 @@ class StandardModeSetup:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
 
+    def is_first_run(self) -> bool:
+        """Check if this is the first time running the server"""
+        # Check for any configuration files
+        standard_config = self.config_dir / "standard_config.json"
+        custom_env = Path(".env")
+        first_run_marker = self.config_dir / ".first_run_complete"
+
+        return not (standard_config.exists() or custom_env.exists() or first_run_marker.exists())
+
+    def mark_first_run_complete(self) -> None:
+        """Mark that first-run setup is complete"""
+        self.config_dir.mkdir(exist_ok=True)
+        marker_file = self.config_dir / ".first_run_complete"
+        marker_file.touch()
+
     def check_auth_status(self) -> Tuple[bool, str]:
         """Check if we have valid authentication configured"""
-        # Check for existing .env file
-        if not self.env_file.exists():
-            return False, "No configuration found"
+        # Check for standard mode config
+        standard_config = self.config_dir / "standard_config.json"
+        if standard_config.exists():
+            try:
+                with open(standard_config, 'r') as f:
+                    config_data = json.load(f)
+                token = config_data.get('setup_token')
+                if token and token.startswith('bm_ghl_mcp_'):
+                    return True, "Standard mode configured"
+            except Exception:
+                pass
 
-        # Check for setup token in .env
-        try:
-            with open(self.env_file, 'r') as f:
-                content = f.read()
+        # Check for custom mode (.env file)
+        env_file = Path(".env")
+        if env_file.exists():
+            try:
+                with open(env_file, 'r') as f:
+                    content = f.read()
+                if 'GHL_CLIENT_ID=' in content and 'GHL_CLIENT_SECRET=' in content:
+                    return True, "Custom mode configured"
+            except Exception:
+                pass
 
-            for line in content.split('\n'):
-                line = line.strip()
-                if line.startswith('SETUP_TOKEN='):
-                    token = line.split('=', 1)[1].strip()
-                    if token and token.startswith('bm_ghl_mcp_'):
-                        return True, "Authentication configured"
-
-        except Exception:
-            pass
-
-        return False, "Invalid or missing setup token"
+        return False, "No valid configuration found"
 
     async def validate_token(self, token: str) -> SetupResponse:
         """Validate setup token with Basic Machines API"""
@@ -108,49 +130,90 @@ class StandardModeSetup:
             )
 
     def save_token_to_config(self, token: str) -> None:
-        """Save validated token to .env file"""
+        """Save validated token to config file"""
         # Create config directory if it doesn't exist
         self.config_dir.mkdir(exist_ok=True)
 
-        # Create .env content
-        env_content = f"""# Basic Machines GoHighLevel MCP Server Configuration
-# Generated on {datetime.now().isoformat()}
+        # Save token to config file (JSON format)
+        config_data = {
+            "auth_mode": "standard",
+            "setup_token": token,
+            "created_at": datetime.now().isoformat(),
+            "supabase_url": "https://egigkzfowimxfavnjvpe.supabase.co"
+        }
 
-# Authentication mode
-AUTH_MODE=standard
+        # Write to standard_config.json file
+        config_file = self.config_dir / "standard_config.json"
+        with open(config_file, 'w') as f:
+            json.dump(config_data, f, indent=2)
 
-# Basic Machines setup token
-SETUP_TOKEN={token}
+    def choose_auth_mode(self) -> str:
+        """Let user choose between Standard and Custom authentication mode"""
+        print("\n🚀 Welcome to GoHighLevel MCP Server!\n")
+        print("Choose your authentication mode:\n")
 
-# Supabase configuration (managed by Basic Machines)
-SUPABASE_URL=https://egigkzfowimxfavnjvpe.supabase.co
-SUPABASE_ACCESS_KEY={token}
+        print("📋 1. Standard Mode (Recommended)")
+        print("   • Zero configuration required")
+        print("   • Uses Basic Machines' hosted app")
+        print("   • Quick setup through marketplace")
+        print("   • Automatically managed authentication\n")
 
-# Marketplace app configuration
-MARKETPLACE_APP_ID=ghl-mcp-server
-"""
+        print("🔧 2. Custom Mode (Advanced)")
+        print("   • Use your own GoHighLevel Marketplace App")
+        print("   • Requires creating app in GHL Developer Portal")
+        print("   • Manual configuration with .env file")
+        print("   • Full control over OAuth settings\n")
 
-        # Write to .env file
-        with open(self.env_file, 'w') as f:
-            f.write(env_content)
+        while True:
+            choice = input("Enter 1 for Standard or 2 for Custom [1]: ").strip()
+            if choice == "" or choice == "1":
+                return "standard"
+            elif choice == "2":
+                return "custom"
+            else:
+                print("Please enter 1 or 2.")
+
+    def show_custom_mode_instructions(self) -> None:
+        """Show instructions for setting up custom mode"""
+        print("\n🔧 Custom Mode Setup Instructions\n")
+
+        print("📋 Step 1: Create a GoHighLevel Marketplace App")
+        print("   1. Visit: https://marketplace.gohighlevel.com/")
+        print("   2. Sign in to your GHL account")
+        print("   3. Go to 'Developer' > 'My Apps' > 'Create App'")
+        print("   4. Set redirect URL to: http://localhost:8080/oauth/callback")
+        print("   5. Note your Client ID and Client Secret\n")
+
+        print("📋 Step 2: Create .env file")
+        print("   Create a .env file in this directory with:")
+        print("   ")
+        print("   AUTH_MODE=custom")
+        print("   GHL_CLIENT_ID=your-client-id-here")
+        print("   GHL_CLIENT_SECRET=your-client-secret-here")
+        print("   \n")
+
+        print("📋 Step 3: Restart the server")
+        print("   After creating the .env file, run:")
+        print("   python -m src.main\n")
+
+        print("💡 Need help? Check the README for detailed instructions.")
+        print("🔗 https://github.com/basicmachines-co/open-ghl-mcp/blob/main/README.md\n")
 
     async def interactive_setup(self) -> bool:
         """Run interactive setup wizard"""
-        print("\n🚀 GoHighLevel MCP Server - Standard Mode Setup\n")
-
-        print("Welcome! This setup wizard will help you connect your MCP server")
-        print("to GoHighLevel using Basic Machines' standard authentication.\n")
-
         print("📋 Setup Steps:")
         print("1. Install the Basic Machines app in your GoHighLevel account")
         print("2. Copy your setup token from the installation success page")
         print("3. Paste the token here to complete setup\n")
 
-        # Open marketplace automatically
-        marketplace_url = "https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=https%3A%2F%2Fegigkzfowimxfavnjvpe.supabase.co%2Ffunctions%2Fv1%2Foauth-callback&client_id=683d23275f311ae4ccf17876-mbeko6sk&scope=conversations.readonly+conversations.write+conversations%2Fmessage.readonly+conversations%2Fmessage.write+conversations%2Freports.readonly+conversations%2Flivechat.write+contacts.readonly+contacts.write"
-        print(f"🌐 Opening GoHighLevel Marketplace...")
-        print(f"   {marketplace_url}")
-        print("\nIf the browser doesn't open automatically, please visit the URL above.\n")
+        # Show marketplace URL and wait for user confirmation
+        marketplace_url = "https://app.gohighlevel.com/integration/683d23275f311ae4ccf17876"
+        print(f"🌐 We'll open the GoHighLevel Marketplace to install the app:")
+        print(f"   {marketplace_url}\n")
+
+        input("Press Enter to open the marketplace in your browser...")
+
+        print("\n🌐 Opening GoHighLevel Marketplace...")
 
         try:
             webbrowser.open(marketplace_url)
@@ -184,10 +247,11 @@ MARKETPLACE_APP_ID=ghl-mcp-server
                     print("💾 Saving configuration...")
 
                     self.save_token_to_config(token)
+                    self.mark_first_run_complete()
 
                     print("🎉 Setup complete!")
                     print("   Your MCP server is now configured for Standard mode.")
-                    print("   Configuration saved to .env file.\n")
+                    print("   Configuration saved successfully.\n")
                     return True
 
                 else:
@@ -223,24 +287,25 @@ MARKETPLACE_APP_ID=ghl-mcp-server
         if not auth_valid:
             return False
 
-        # Load token from .env
+        # Load token from standard_config.json
         try:
-            with open(self.env_file, 'r') as f:
-                content = f.read()
-
-            token = None
-            for line in content.split('\n'):
-                line = line.strip()
-                if line.startswith('SETUP_TOKEN='):
-                    token = line.split('=', 1)[1].strip()
-                    break
-
+            config_file = self.config_dir / "standard_config.json"
+            with open(config_file, 'r') as f:
+                config_data = json.load(f)
+            
+            token = config_data.get('setup_token')
             if not token:
+                print(f"DEBUG: No setup_token found in config", file=sys.stderr)
                 return False
 
             # Validate token with API
             validation = await self.validate_token(token)
+            if not validation.valid:
+                print(f"DEBUG: Token validation failed: {validation.message}", file=sys.stderr)
             return validation.valid
 
-        except Exception:
+        except Exception as e:
+            print(f"DEBUG: Exception during validation: {type(e).__name__}: {str(e)}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
             return False

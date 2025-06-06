@@ -28,27 +28,39 @@ async def startup_check_and_setup() -> bool:
     print("   Version 0.1.0")
 
     async with StandardModeSetup() as setup:
-        # Check current auth status
-        auth_valid, message = setup.check_auth_status()
+        # Check if this is first run
+        if setup.is_first_run():
+            # First run - let user choose mode
+            chosen_mode = setup.choose_auth_mode()
 
-        if auth_valid:
-            # Validate existing config with API
-            print(f"✅ {message}")
-            print("🔍 Validating configuration with Basic Machines...")
+            if chosen_mode == "custom":
+                # Custom mode chosen - show instructions and exit
+                setup.show_custom_mode_instructions()
+                setup.mark_first_run_complete()
+                print("🛑 Server will now exit. Please complete custom setup and restart.")
+                return False
 
-            config_valid = await setup.validate_existing_config()
-            if config_valid:
-                print("✅ Configuration validated successfully!")
-                return True
-            else:
-                print("⚠️  Configuration validation failed.")
-                print("   Your setup token may have expired or become invalid.\n")
-
+            # Standard mode chosen - continue with setup
+            print("📋 Continuing with Standard Mode setup...\n")
         else:
-            print(f"⚠️  {message}")
+            # Not first run - check existing auth status
+            auth_valid, message = setup.check_auth_status()
 
-        # Need to run setup
-        print("🚀 Starting Standard Mode setup wizard...\n")
+            if auth_valid:
+                # Validate existing config with API
+                print(f"✅ {message}")
+                print("🔍 Validating configuration with Basic Machines...")
+
+                config_valid = await setup.validate_existing_config()
+                if config_valid:
+                    print("✅ Configuration validated successfully!")
+                    return True
+                else:
+                    print("⚠️  Configuration validation failed.")
+                    print("   Your setup token may have expired or become invalid.")
+                    print("🚀 Re-running setup wizard...\n")
+
+        # Run setup wizard
 
         setup_success = await setup.interactive_setup()
 
@@ -687,27 +699,52 @@ async def get_conversation_resource(location_id: str, conversation_id: str) -> s
     return "\n".join(lines)
 
 
-async def main():
+def main():
     """Main function with startup check and setup"""
-    # Run startup check and setup if needed
-    setup_success = await startup_check_and_setup()
-
-    if not setup_success:
-        print("🛑 Server startup failed due to setup failure.")
-        sys.exit(1)
+    
+    # Check if we're running in MCP mode (no TTY) vs manual mode (with TTY)
+    import sys
+    is_mcp_mode = not sys.stdin.isatty()
+    
+    if is_mcp_mode:
+        # MCP client mode - validate config silently, don't run interactive setup
+        async def silent_check():
+            async with StandardModeSetup() as setup:
+                auth_valid, message = setup.check_auth_status()
+                if not auth_valid:
+                    print(f"ERROR: {message}. Please run 'python -m src.main' manually to complete setup.", file=sys.stderr)
+                    return False
+                
+                # Try to validate existing config
+                config_valid = await setup.validate_existing_config()
+                if not config_valid:
+                    print("ERROR: Configuration validation failed. Please run 'python -m src.main' manually to re-setup.", file=sys.stderr)
+                    return False
+                    
+                return True
+        
+        setup_success = asyncio.run(silent_check())
+        if not setup_success:
+            sys.exit(1)
+    else:
+        # Manual mode - run full interactive setup if needed
+        setup_success = asyncio.run(startup_check_and_setup())
+        if not setup_success:
+            print("🛑 Server startup failed due to setup failure.")
+            sys.exit(1)
 
     # Initialize clients after successful setup
     initialize_clients()
 
-    print("🚀 Starting MCP server...")
-    print("   Ready to receive requests from your LLM!")
-    print("   Press Ctrl+C to stop the server.\n")
+    if not is_mcp_mode:
+        print("🚀 Starting MCP server...")
+        print("   Ready to receive requests from your LLM!")
+        print("   Press Ctrl+C to stop the server.\n")
 
-    # Start the FastMCP server
-    import uvicorn
-    uvicorn.run("src.main:mcp", host="0.0.0.0", port=8000, lifespan="on", reload=False)
+    # Start the FastMCP server using its built-in run method
+    mcp.run()
 
 
 # Run the server
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
