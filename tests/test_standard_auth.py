@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch, Mock
 from datetime import datetime, timedelta
 import json
 
-from src.services.oauth import StandardAuthService
+from src.services.oauth import StandardAuthService, OAuthSettings, AuthMode
 
 
 class TestStandardAuthService:
@@ -32,18 +32,14 @@ class TestStandardAuthService:
         return config_dir
 
     @pytest.fixture
-    def auth_service(self, mock_config):
+    def auth_service(self, mock_config, setup_token):
         """Create StandardAuthService with mock config"""
-        with patch("src.services.oauth.Path") as mock_path:
-            # Mock the config directory path
-            mock_path.return_value = mock_config.parent
-            mock_path.return_value.__truediv__ = lambda self, x: mock_config.parent / x
-
-            service = StandardAuthService()
-            service.config_dir = mock_config
-            service.config_file = mock_config / "standard_config.json"
-            service.client = AsyncMock()  # Add mock client
-            return service
+        settings = OAuthSettings(
+            auth_mode=AuthMode.STANDARD, supabase_access_key=setup_token
+        )
+        service = StandardAuthService(settings)
+        service.client = AsyncMock()  # Add mock client
+        return service
 
     @pytest.mark.asyncio
     async def test_get_company_token_cached(self, auth_service):

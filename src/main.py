@@ -3,7 +3,6 @@
 
 import asyncio
 import os
-from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 from fastmcp import FastMCP
@@ -33,13 +32,16 @@ async def startup_check_and_setup():
             chosen_mode = setup.choose_auth_mode()
 
             if chosen_mode == "custom":
-                # Custom mode chosen - show instructions and exit
-                setup.show_custom_mode_instructions()
+                # Custom mode chosen - run interactive setup
+                custom_setup_success = setup.interactive_custom_setup()
                 setup.mark_first_run_complete()
-                print(
-                    "🛑 Server will now exit. Please complete custom setup and restart."
-                )
-                return False
+
+                if custom_setup_success:
+                    # Credentials collected and .env created
+                    return "exit_after_custom_setup"
+                else:
+                    # User needs to create app first or cancelled
+                    return "exit_after_custom_instructions"
 
             # Standard mode chosen - continue with setup
             print("📋 Continuing with Standard Mode setup...\n")
@@ -61,15 +63,33 @@ async def startup_check_and_setup():
                     print("   Your setup token may have expired or become invalid.")
                     print("🚀 Re-running setup wizard...\n")
 
-        # Run setup wizard
+        # Run setup wizard based on current mode
+        auth_valid, message = setup.check_auth_status()
 
-        setup_success = await setup.interactive_setup()
+        # Check if we're in custom mode (has .env file)
+        from pathlib import Path
 
-        if not setup_success:
-            print("❌ Setup was not completed successfully.")
-            print("   The MCP server cannot start without valid authentication.")
-            print("   Please run the server again to retry setup.\n")
-            return False
+        env_file = Path(".env")
+
+        if env_file.exists():
+            # Custom mode - re-run custom setup
+            print("🔧 Re-running Custom Mode setup...\n")
+            custom_setup_success = setup.interactive_custom_setup()
+
+            if custom_setup_success:
+                return "exit_after_custom_setup"
+            else:
+                return "exit_after_custom_instructions"
+        else:
+            # Standard mode - run standard setup
+            print("📋 Running Standard Mode setup...\n")
+            setup_success = await setup.interactive_setup()
+
+            if not setup_success:
+                print("❌ Setup was not completed successfully.")
+                print("   The MCP server cannot start without valid authentication.")
+                print("   Please run the server again to retry setup.\n")
+                return False
 
         # Setup completed successfully - show Claude Desktop instructions
         print("\n" + "=" * 60)
@@ -802,7 +822,13 @@ def main():
         setup_result = asyncio.run(startup_check_and_setup())
 
         if setup_result == "exit_after_setup":
-            # Setup completed successfully, exit gracefully
+            # Standard mode setup completed successfully, exit gracefully
+            sys.exit(0)
+        elif setup_result == "exit_after_custom_setup":
+            # Custom mode setup completed successfully, exit gracefully
+            sys.exit(0)
+        elif setup_result == "exit_after_custom_instructions":
+            # Custom mode instructions shown, exit gracefully
             sys.exit(0)
         elif not setup_result:
             print("🛑 Server startup failed due to setup failure.")

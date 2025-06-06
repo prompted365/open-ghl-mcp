@@ -72,6 +72,11 @@ The MCP server follows a modular architecture:
    - Request/response validation
    - Type safety throughout the codebase
 
+5. **CI/CD** (`.github/workflows/test.yml`)
+   - Git for source control
+   - GitHub Actions for CI/CD
+   - Tests run on every push
+
 ## Key Implementation Details
 
 ### Authentication Flow

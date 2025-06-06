@@ -176,33 +176,101 @@ class StandardModeSetup:
             else:
                 print("Please enter 1 or 2.")
 
-    def show_custom_mode_instructions(self) -> None:
-        """Show instructions for setting up custom mode"""
-        print("\n🔧 Custom Mode Setup Instructions\n")
+    def interactive_custom_setup(self) -> bool:
+        """Interactive setup for custom mode"""
+        print("\n🔧 Custom Mode Setup\n")
 
-        print("📋 Step 1: Create a GoHighLevel Marketplace App")
-        print("   1. Visit: https://marketplace.gohighlevel.com/")
-        print("   2. Sign in to your GHL account")
-        print("   3. Go to 'Developer' > 'My Apps' > 'Create App'")
-        print("   4. Set redirect URL to: http://localhost:8080/oauth/callback")
-        print("   5. Note your Client ID and Client Secret\n")
+        # Ask if they have created their marketplace app
+        print("📋 GoHighLevel Marketplace App Required")
+        print("   Custom mode requires your own GoHighLevel Marketplace App.\n")
 
-        print("📋 Step 2: Create .env file")
-        print("   Create a .env file in this directory with:")
-        print("   ")
-        print("   AUTH_MODE=custom")
-        print("   GHL_CLIENT_ID=your-client-id-here")
-        print("   GHL_CLIENT_SECRET=your-client-secret-here")
-        print("   \n")
+        while True:
+            has_app = (
+                input("Have you already created a GoHighLevel Marketplace App? (y/n): ")
+                .strip()
+                .lower()
+            )
+            if has_app in ["y", "yes"]:
+                return self._collect_custom_credentials()
+            elif has_app in ["n", "no"]:
+                self._show_marketplace_app_instructions()
+                return False
+            else:
+                print("Please enter 'y' for yes or 'n' for no.")
 
-        print("📋 Step 3: Restart the server")
-        print("   After creating the .env file, run:")
-        print("   python -m src.main\n")
+    def _collect_custom_credentials(self) -> bool:
+        """Collect and save custom credentials"""
+        print("\n📋 Enter Your Marketplace App Credentials\n")
+
+        try:
+            # Collect credentials
+            client_id = input("Enter your GHL_CLIENT_ID: ").strip()
+            if not client_id:
+                print("❌ Client ID cannot be empty.")
+                return False
+
+            client_secret = input("Enter your GHL_CLIENT_SECRET: ").strip()
+            if not client_secret:
+                print("❌ Client Secret cannot be empty.")
+                return False
+
+            # Create .env file content
+            env_content = f"""# GoHighLevel MCP Server - Custom Mode Configuration
+AUTH_MODE=custom
+GHL_CLIENT_ID={client_id}
+GHL_CLIENT_SECRET={client_secret}
+
+# OAuth settings (modify if needed)
+OAUTH_REDIRECT_URI=http://localhost:8080/oauth/callback
+OAUTH_SERVER_PORT=8080
+"""
+
+            # Write .env file
+            env_file = Path(".env")
+            with open(env_file, "w") as f:
+                f.write(env_content)
+
+            print("✅ Configuration saved to .env file!")
+            print("🎉 Custom mode setup complete!")
+            print(
+                "\n🛑 Server will now exit. Restart to use your custom configuration:"
+            )
+            print("   python -m src.main\n")
+
+            return True
+
+        except KeyboardInterrupt:
+            print("\n\n⏹️  Setup cancelled by user.")
+            return False
+        except Exception as e:
+            print(f"\n❌ Error saving configuration: {e}")
+            return False
+
+    def _show_marketplace_app_instructions(self) -> None:
+        """Show instructions for creating a marketplace app"""
+        print("\n📋 How to Create a GoHighLevel Marketplace App\n")
+
+        print("1. 🌐 Visit: https://marketplace.gohighlevel.com/")
+        print("2. 🔐 Sign in to your GHL account")
+        print("3. 🔧 Go to 'Developer' → 'My Apps' → 'Create App'")
+        print("4. 📝 Fill out your app details")
+        print("5. 🔗 Set redirect URL to: http://localhost:8080/oauth/callback")
+        print("6. 💾 Save your app and note the Client ID and Client Secret\n")
+
+        print("📋 Required Scopes (select these when creating your app):")
+        print("   • contacts.readonly")
+        print("   • contacts.write")
+        print("   • conversations.readonly")
+        print("   • conversations.write")
+        print("   • conversations/message.readonly")
+        print("   • conversations/message.write\n")
 
         print("💡 Need help? Check the README for detailed instructions.")
+        print("🔗 https://github.com/basicmachines-co/open-ghl-mcp/blob/main/README.md")
         print(
-            "🔗 https://github.com/basicmachines-co/open-ghl-mcp/blob/main/README.md\n"
+            "\n🔄 After creating your app, run this command again and select 'y' when asked."
         )
+        print("   python -m src.main\n")
 
     async def interactive_setup(self) -> bool:
         """Run interactive setup wizard"""
@@ -294,11 +362,27 @@ class StandardModeSetup:
 
     async def validate_existing_config(self) -> bool:
         """Validate existing configuration"""
-        auth_valid, _ = self.check_auth_status()
+        auth_valid, message = self.check_auth_status()
         if not auth_valid:
             return False
 
-        # Load token from standard_config.json
+        # Check if we're in custom mode
+        env_file = Path(".env")
+        if env_file.exists():
+            # Custom mode - just check that .env file has required fields
+            try:
+                with open(env_file, "r") as f:
+                    content = f.read()
+                if "GHL_CLIENT_ID=" in content and "GHL_CLIENT_SECRET=" in content:
+                    return True
+                else:
+                    print("DEBUG: .env file missing required fields", file=sys.stderr)
+                    return False
+            except Exception as e:
+                print(f"DEBUG: Error reading .env file: {e}", file=sys.stderr)
+                return False
+
+        # Standard mode - validate token with API
         try:
             config_file = self.config_dir / "standard_config.json"
             with open(config_file, "r") as f:
