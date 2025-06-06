@@ -300,7 +300,9 @@ class GoHighLevelClient:
         data = response.json()
         # API returns {conversationId, messageId} for sent messages
         # Convert message type to int for the response
-        message_type_int = 1 if message.type == "SMS" else 2 if message.type == "Email" else 0
+        message_type_int = (
+            1 if message.type == "SMS" else 2 if message.type == "Email" else 0
+        )
         return Message(
             id=data.get("messageId", data.get("id", "unknown")),
             conversationId=data.get("conversationId", conversation_id),

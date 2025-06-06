@@ -3,15 +3,15 @@ import json
 import secrets
 import webbrowser
 from pathlib import Path
-from typing import Optional, Dict, Literal
+from typing import Optional, Dict
 from urllib.parse import urlencode, parse_qs
 from datetime import datetime, timedelta
 from enum import Enum
 
 import httpx
 from aiofiles import open as aio_open
-from pydantic_settings import BaseSettings
-from pydantic import Field, ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 
 from ..models.auth import TokenResponse, StoredToken
 
@@ -24,7 +24,7 @@ class AuthMode(str, Enum):
 class OAuthSettings(BaseSettings):
     """OAuth configuration from environment"""
 
-    # Auth mode selection  
+    # Auth mode selection
     auth_mode: AuthMode = Field(default=AuthMode.STANDARD)
 
     # Standard mode settings (hardcoded for Basic Machines infrastructure)
@@ -41,7 +41,7 @@ class OAuthSettings(BaseSettings):
     oauth_server_port: int = 8080
     token_storage_path: str = "./config/tokens.json"
 
-    model_config = ConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     def model_post_init(self, __context):
         """Validate required fields based on auth mode"""
@@ -68,9 +68,9 @@ class StandardAuthService:
         config_file = base_dir / "config" / "standard_config.json"
         if config_file.exists():
             try:
-                with open(config_file, 'r') as f:
+                with open(config_file, "r") as f:
                     config_data = json.load(f)
-                token = config_data.get('setup_token')
+                token = config_data.get("setup_token")
                 if token:
                     self.settings.supabase_access_key = token
             except Exception:
@@ -103,15 +103,15 @@ class StandardAuthService:
             json={
                 "location_id": "any",  # We just need any location to get the company token
                 "marketplace_app_id": self.settings.marketplace_app_id,
-            }
+            },
         )
 
         if response.status_code == 404:
             # Token not found, need to authenticate
             print("\nNo token found. Please authenticate:")
-            print(f"1. Visit: {self.settings.supabase_url}/auth/login")
-            print(f"2. After login, visit the OAuth initiation endpoint")
-            print(f"3. Complete the GoHighLevel authorization flow")
+            print("1. Visit: " + self.settings.supabase_url + "/auth/login")
+            print("2. After login, visit the OAuth initiation endpoint")
+            print("3. Complete the GoHighLevel authorization flow")
             raise Exception("Authentication required. Please complete the OAuth flow.")
 
         response.raise_for_status()
@@ -122,34 +122,39 @@ class StandardAuthService:
 
         return token_data["access_token"]
 
-    async def _exchange_company_for_location_token(self, company_token: str, company_id: str, location_id: str) -> str:
+    async def _exchange_company_for_location_token(
+        self, company_token: str, company_id: str, location_id: str
+    ) -> str:
         """Exchange a company token for a location-specific token"""
         print(f"Exchanging company token for location token (location: {location_id})")
-        
+
         response = await self.client.post(
             "https://services.leadconnectorhq.com/oauth/locationToken",
             headers={
                 "Authorization": f"Bearer {company_token}",
                 "Version": "2021-07-28",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             },
-            json={
-                "companyId": company_id,
-                "locationId": location_id
-            }
+            json={"companyId": company_id, "locationId": location_id},
         )
 
         if response.status_code not in [200, 201]:
             error_text = response.text
-            print(f"Location token exchange failed: {response.status_code} - {error_text}")
-            raise Exception(f"Failed to exchange company token for location token: {response.status_code}")
+            print(
+                f"Location token exchange failed: {response.status_code} - {error_text}"
+            )
+            raise Exception(
+                f"Failed to exchange company token for location token: {response.status_code}"
+            )
 
         token_data = response.json()
-        location_token = token_data.get('access_token')
-        
+        location_token = token_data.get("access_token")
+
         if not location_token:
-            raise Exception("Location token exchange succeeded but no access_token returned")
-            
+            raise Exception(
+                "Location token exchange succeeded but no access_token returned"
+            )
+
         print(f"Successfully obtained location token for {location_id}")
         return location_token
 
@@ -167,24 +172,28 @@ class StandardAuthService:
 
         # Get company token first
         company_token = await self.get_company_token()
-        
+
         # Parse company token to get company ID
         import base64
         import json as json_module
+
         try:
             # Split JWT and decode payload (without signature verification)
-            parts = company_token.split('.')
+            parts = company_token.split(".")
             if len(parts) >= 2:
                 # Add padding if needed
                 payload = parts[1]
-                payload += '=' * (4 - len(payload) % 4)
+                payload += "=" * (4 - len(payload) % 4)
                 decoded_payload = base64.urlsafe_b64decode(payload)
                 jwt_data = json_module.loads(decoded_payload)
-                
-                company_id = jwt_data.get('authClassId')
-                if not company_id:
+
+                raw_company_id = jwt_data.get("authClassId")
+                if not raw_company_id:
                     raise Exception("Could not extract company ID from token")
-                    
+                company_id = str(raw_company_id)
+            else:
+                raise Exception("Invalid token format")
+
         except Exception as e:
             raise Exception(f"Failed to parse company token: {e}")
 
@@ -192,16 +201,16 @@ class StandardAuthService:
         location_token = await self._exchange_company_for_location_token(
             company_token, company_id, location_id
         )
-        
+
         # Cache the location token with a reasonable expiration
         # Location tokens typically expire in 1 hour
         expires_at = datetime.now() + timedelta(hours=1)
         location_token_data = {
             "access_token": location_token,
             "expires_at": expires_at.isoformat(),
-            "location_id": location_id
+            "location_id": location_id,
         }
-        
+
         self._location_token_cache[location_id] = location_token_data
 
         return location_token

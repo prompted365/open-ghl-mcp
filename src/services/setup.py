@@ -3,7 +3,7 @@ Standard Mode Setup Wizard for GoHighLevel MCP Server
 """
 
 import json
-import os
+import sys
 import webbrowser
 from pathlib import Path
 from typing import Optional, Tuple
@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 class SetupResponse(BaseModel):
     """Response from token validation"""
+
     valid: bool
     config: Optional[dict] = None
     message: str
@@ -44,7 +45,9 @@ class StandardModeSetup:
         custom_env = Path(".env")
         first_run_marker = self.config_dir / ".first_run_complete"
 
-        return not (standard_config.exists() or custom_env.exists() or first_run_marker.exists())
+        return not (
+            standard_config.exists() or custom_env.exists() or first_run_marker.exists()
+        )
 
     def mark_first_run_complete(self) -> None:
         """Mark that first-run setup is complete"""
@@ -58,10 +61,10 @@ class StandardModeSetup:
         standard_config = self.config_dir / "standard_config.json"
         if standard_config.exists():
             try:
-                with open(standard_config, 'r') as f:
+                with open(standard_config, "r") as f:
                     config_data = json.load(f)
-                token = config_data.get('setup_token')
-                if token and token.startswith('bm_ghl_mcp_'):
+                token = config_data.get("setup_token")
+                if token and token.startswith("bm_ghl_mcp_"):
                     return True, "Standard mode configured"
             except Exception:
                 pass
@@ -70,9 +73,9 @@ class StandardModeSetup:
         env_file = Path(".env")
         if env_file.exists():
             try:
-                with open(env_file, 'r') as f:
+                with open(env_file, "r") as f:
                     content = f.read()
-                if 'GHL_CLIENT_ID=' in content and 'GHL_CLIENT_SECRET=' in content:
+                if "GHL_CLIENT_ID=" in content and "GHL_CLIENT_SECRET=" in content:
                     return True, "Custom mode configured"
             except Exception:
                 pass
@@ -81,11 +84,11 @@ class StandardModeSetup:
 
     async def validate_token(self, token: str) -> SetupResponse:
         """Validate setup token with Basic Machines API"""
-        if not token or not token.startswith('bm_ghl_mcp_'):
+        if not token or not token.startswith("bm_ghl_mcp_"):
             return SetupResponse(
                 valid=False,
                 error="invalid_format",
-                message="Token must start with 'bm_ghl_mcp_'"
+                message="Token must start with 'bm_ghl_mcp_'",
             )
 
         try:
@@ -93,9 +96,9 @@ class StandardModeSetup:
                 "https://egigkzfowimxfavnjvpe.supabase.co/functions/v1/get-setup-token",
                 headers={
                     "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 },
-                timeout=10.0
+                timeout=10.0,
             )
 
             if response.status_code == 200:
@@ -107,26 +110,26 @@ class StandardModeSetup:
                     return SetupResponse(
                         valid=False,
                         error=error_data.get("error", "unknown"),
-                        message=error_data.get("message", f"HTTP {response.status_code}")
+                        message=error_data.get(
+                            "message", f"HTTP {response.status_code}"
+                        ),
                     )
-                except:
+                except Exception:
                     return SetupResponse(
                         valid=False,
                         error="http_error",
-                        message=f"HTTP {response.status_code}: {response.text[:100]}"
+                        message=f"HTTP {response.status_code}: {response.text[:100]}",
                     )
 
         except httpx.TimeoutException:
             return SetupResponse(
                 valid=False,
                 error="timeout",
-                message="Request timed out. Please check your internet connection."
+                message="Request timed out. Please check your internet connection.",
             )
         except Exception as e:
             return SetupResponse(
-                valid=False,
-                error="network_error",
-                message=f"Network error: {str(e)}"
+                valid=False, error="network_error", message=f"Network error: {str(e)}"
             )
 
     def save_token_to_config(self, token: str) -> None:
@@ -139,12 +142,12 @@ class StandardModeSetup:
             "auth_mode": "standard",
             "setup_token": token,
             "created_at": datetime.now().isoformat(),
-            "supabase_url": "https://egigkzfowimxfavnjvpe.supabase.co"
+            "supabase_url": "https://egigkzfowimxfavnjvpe.supabase.co",
         }
 
         # Write to standard_config.json file
         config_file = self.config_dir / "standard_config.json"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config_data, f, indent=2)
 
     def choose_auth_mode(self) -> str:
@@ -197,7 +200,9 @@ class StandardModeSetup:
         print("   python -m src.main\n")
 
         print("💡 Need help? Check the README for detailed instructions.")
-        print("🔗 https://github.com/basicmachines-co/open-ghl-mcp/blob/main/README.md\n")
+        print(
+            "🔗 https://github.com/basicmachines-co/open-ghl-mcp/blob/main/README.md\n"
+        )
 
     async def interactive_setup(self) -> bool:
         """Run interactive setup wizard"""
@@ -207,8 +212,10 @@ class StandardModeSetup:
         print("3. Paste the token here to complete setup\n")
 
         # Show marketplace URL and wait for user confirmation
-        marketplace_url = "https://app.gohighlevel.com/integration/683d23275f311ae4ccf17876"
-        print(f"🌐 We'll open the GoHighLevel Marketplace to install the app:")
+        marketplace_url = (
+            "https://app.gohighlevel.com/integration/683d23275f311ae4ccf17876"
+        )
+        print("🌐 We'll open the GoHighLevel Marketplace to install the app:")
         print(f"   {marketplace_url}\n")
 
         input("Press Enter to open the marketplace in your browser...")
@@ -259,14 +266,18 @@ class StandardModeSetup:
                     print(f"❌ Token validation failed: {validation.message}")
 
                     if validation.error == "token_expired":
-                        print("   Please reinstall the Basic Machines app to get a new token.")
+                        print(
+                            "   Please reinstall the Basic Machines app to get a new token."
+                        )
                     elif validation.error == "invalid_format":
                         print("   Make sure you copied the complete token.")
                     elif validation.error in ["timeout", "network_error"]:
                         print("   Please check your internet connection and try again.")
 
                     if remaining > 0:
-                        print(f"   You have {remaining} attempt{'s' if remaining > 1 else ''} remaining.\n")
+                        print(
+                            f"   You have {remaining} attempt{'s' if remaining > 1 else ''} remaining.\n"
+                        )
                         continue
                     else:
                         print("\n❌ Maximum attempts reached. Setup cancelled.")
@@ -290,22 +301,29 @@ class StandardModeSetup:
         # Load token from standard_config.json
         try:
             config_file = self.config_dir / "standard_config.json"
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config_data = json.load(f)
-            
-            token = config_data.get('setup_token')
+
+            token = config_data.get("setup_token")
             if not token:
-                print(f"DEBUG: No setup_token found in config", file=sys.stderr)
+                print("DEBUG: No setup_token found in config", file=sys.stderr)
                 return False
 
             # Validate token with API
             validation = await self.validate_token(token)
             if not validation.valid:
-                print(f"DEBUG: Token validation failed: {validation.message}", file=sys.stderr)
+                print(
+                    f"DEBUG: Token validation failed: {validation.message}",
+                    file=sys.stderr,
+                )
             return validation.valid
 
         except Exception as e:
-            print(f"DEBUG: Exception during validation: {type(e).__name__}: {str(e)}", file=sys.stderr)
+            print(
+                f"DEBUG: Exception during validation: {type(e).__name__}: {str(e)}",
+                file=sys.stderr,
+            )
             import traceback
+
             traceback.print_exc(file=sys.stderr)
             return False

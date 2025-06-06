@@ -3,7 +3,6 @@
 
 import asyncio
 import os
-import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
@@ -22,7 +21,7 @@ from .models.conversation import (
 )
 
 
-async def startup_check_and_setup() -> bool:
+async def startup_check_and_setup():
     """Check authentication status and run setup if needed"""
     print("🔧 Basic Machines -> GoHighLevel MCP Server")
     print("   Version 0.1.0")
@@ -37,7 +36,9 @@ async def startup_check_and_setup() -> bool:
                 # Custom mode chosen - show instructions and exit
                 setup.show_custom_mode_instructions()
                 setup.mark_first_run_complete()
-                print("🛑 Server will now exit. Please complete custom setup and restart.")
+                print(
+                    "🛑 Server will now exit. Please complete custom setup and restart."
+                )
                 return False
 
             # Standard mode chosen - continue with setup
@@ -70,7 +71,56 @@ async def startup_check_and_setup() -> bool:
             print("   Please run the server again to retry setup.\n")
             return False
 
-        return True
+        # Setup completed successfully - show Claude Desktop instructions
+        print("\n" + "=" * 60)
+        print("🎯 Next Step: Configure Claude Desktop")
+        print("=" * 60)
+
+        # Check for virtual environment
+        venv_path = Path(os.getcwd()) / ".venv"
+        if venv_path.exists():
+            python_path = str(venv_path / "bin" / "python")
+        else:
+            python_path = "python"
+            print("\n⚠️  Warning: No .venv directory found.")
+            print("   Make sure you have installed requirements:")
+            print("   python -m venv .venv")
+            print(
+                "   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate"
+            )
+            print("   pip install -r requirements.txt")
+
+        print("\n📋 Add this server to Claude Desktop:")
+        print("\n1. Open Claude Desktop settings")
+        print("2. Navigate to 'Developer' → 'Edit Config'")
+        print("3. Add the following to your mcpServers configuration:")
+        print(
+            f"""
+{{
+  "mcpServers": {{
+    "ghl-mcp-server": {{
+      "command": "{python_path}",
+      "args": [
+        "-m",
+        "src.main"
+      ],
+      "cwd": "{os.getcwd()}",
+      "env": {{
+        "PYTHONPATH": "{os.getcwd()}"
+      }}
+    }}
+  }}
+}}
+"""
+        )
+        print("4. Save the configuration and restart Claude Desktop")
+        print("\n✅ Your GoHighLevel MCP server is now configured!")
+        print("   The server will automatically start when you use Claude Desktop.")
+        print("\n🛑 This setup process is complete. The server will now exit.")
+        print("   Claude Desktop will manage the server lifecycle from now on.\n")
+
+        # Exit after successful setup
+        return "exit_after_setup"
 
 
 # Initialize FastMCP server
@@ -84,6 +134,7 @@ mcp: FastMCP = FastMCP(
 # Global clients - will be initialized after startup check
 oauth_service: Optional[OAuthService] = None
 ghl_client: Optional[GoHighLevelClient] = None
+
 
 def initialize_clients():
     """Initialize OAuth service and GHL client after setup"""
@@ -299,7 +350,9 @@ async def get_client(access_token: Optional[str] = None) -> GoHighLevelClient:
     """Get GHL client with optional token override"""
     # Ensure clients are initialized
     if oauth_service is None or ghl_client is None:
-        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
 
     if access_token:
         # Create a temporary client with the provided token
@@ -308,6 +361,7 @@ async def get_client(access_token: Optional[str] = None) -> GoHighLevelClient:
         # Create an async function that returns the token
         async def return_token() -> str:
             return access_token
+
         temp_oauth.get_valid_token = return_token  # type: ignore
         return GoHighLevelClient(temp_oauth)
     return ghl_client
@@ -484,7 +538,9 @@ async def create_conversation(params: CreateConversationParams) -> Dict[str, Any
     conversation_data = ConversationCreate(
         locationId=params.location_id,
         contactId=params.contact_id,
-        lastMessageType=MessageType(params.message_type) if params.message_type else None,
+        lastMessageType=(
+            MessageType(params.message_type) if params.message_type else None
+        ),
     )
 
     conversation = await client.create_conversation(conversation_data)
@@ -557,7 +613,9 @@ async def update_message_status(params: UpdateMessageStatusParams) -> Dict[str, 
 async def list_contacts_resource(location_id: str) -> str:
     """List all contacts for a location as a resource"""
     if ghl_client is None:
-        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
     result = await ghl_client.get_contacts(location_id=location_id, limit=100)
 
     # Format contacts as readable text
@@ -588,7 +646,9 @@ async def list_contacts_resource(location_id: str) -> str:
 async def get_contact_resource(location_id: str, contact_id: str) -> str:
     """Get a single contact as a resource"""
     if ghl_client is None:
-        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
     contact = await ghl_client.get_contact(contact_id, location_id)
 
     # Format contact as readable text
@@ -634,7 +694,9 @@ async def get_contact_resource(location_id: str, contact_id: str) -> str:
 async def list_conversations_resource(location_id: str) -> str:
     """List all conversations for a location as a resource"""
     if ghl_client is None:
-        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
     result = await ghl_client.get_conversations(location_id=location_id, limit=100)
 
     # Format conversations as readable text
@@ -662,7 +724,9 @@ async def list_conversations_resource(location_id: str) -> str:
 async def get_conversation_resource(location_id: str, conversation_id: str) -> str:
     """Get a single conversation as a resource"""
     if ghl_client is None:
-        raise RuntimeError("MCP server not properly initialized. Please restart the server.")
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
     conversation = await ghl_client.get_conversation(conversation_id, location_id)
     messages = await ghl_client.get_messages(conversation_id, location_id, limit=50)
 
@@ -701,35 +765,46 @@ async def get_conversation_resource(location_id: str, conversation_id: str) -> s
 
 def main():
     """Main function with startup check and setup"""
-    
+
     # Check if we're running in MCP mode (no TTY) vs manual mode (with TTY)
     import sys
+
     is_mcp_mode = not sys.stdin.isatty()
-    
+
     if is_mcp_mode:
         # MCP client mode - validate config silently, don't run interactive setup
         async def silent_check():
             async with StandardModeSetup() as setup:
                 auth_valid, message = setup.check_auth_status()
                 if not auth_valid:
-                    print(f"ERROR: {message}. Please run 'python -m src.main' manually to complete setup.", file=sys.stderr)
+                    print(
+                        f"ERROR: {message}. Please run 'python -m src.main' manually to complete setup.",
+                        file=sys.stderr,
+                    )
                     return False
-                
+
                 # Try to validate existing config
                 config_valid = await setup.validate_existing_config()
                 if not config_valid:
-                    print("ERROR: Configuration validation failed. Please run 'python -m src.main' manually to re-setup.", file=sys.stderr)
+                    print(
+                        "ERROR: Configuration validation failed. Please run 'python -m src.main' manually to re-setup.",
+                        file=sys.stderr,
+                    )
                     return False
-                    
+
                 return True
-        
+
         setup_success = asyncio.run(silent_check())
         if not setup_success:
             sys.exit(1)
     else:
         # Manual mode - run full interactive setup if needed
-        setup_success = asyncio.run(startup_check_and_setup())
-        if not setup_success:
+        setup_result = asyncio.run(startup_check_and_setup())
+
+        if setup_result == "exit_after_setup":
+            # Setup completed successfully, exit gracefully
+            sys.exit(0)
+        elif not setup_result:
             print("🛑 Server startup failed due to setup failure.")
             sys.exit(1)
 
