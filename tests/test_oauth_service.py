@@ -46,7 +46,9 @@ class TestOAuthServiceStandardMode:
         # Ensure we're in standard mode
         oauth_service_standard.settings.auth_mode = AuthMode.STANDARD
         oauth_service_standard._standard_auth = AsyncMock()
-        oauth_service_standard._standard_auth.get_location_token = AsyncMock(return_value=expected_token)
+        oauth_service_standard._standard_auth.get_location_token = AsyncMock(
+            return_value=expected_token
+        )
 
         token = await oauth_service_standard.get_location_token(location_id)
 
@@ -63,7 +65,9 @@ class TestOAuthServiceStandardMode:
         # Ensure we're in standard mode
         oauth_service_standard.settings.auth_mode = AuthMode.STANDARD
         oauth_service_standard._standard_auth = AsyncMock()
-        oauth_service_standard._standard_auth.get_company_token = AsyncMock(return_value=expected_token)
+        oauth_service_standard._standard_auth.get_company_token = AsyncMock(
+            return_value=expected_token
+        )
 
         token = await oauth_service_standard.get_company_token()
 
@@ -109,7 +113,9 @@ class TestOAuthServiceCustomMode:
         """Test loading token when file doesn't exist"""
         # Ensure we're in custom mode
         oauth_service_custom.settings.auth_mode = AuthMode.CUSTOM
-        oauth_service_custom.settings.token_storage_path = "/nonexistent/path/tokens.json"
+        oauth_service_custom.settings.token_storage_path = (
+            "/nonexistent/path/tokens.json"
+        )
 
         token = await oauth_service_custom.load_token()
         assert token is None
@@ -256,7 +262,9 @@ class TestStandardAuthService:
         mock_response.json.return_value = {
             "access_token": "new_company_token",
             "refresh_token": "refresh_token",
-            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+            "expires_at": (
+                datetime.now(timezone.utc) + timedelta(hours=24)
+            ).isoformat(),
             "token_type": "Bearer",
         }
 

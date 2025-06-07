@@ -24,7 +24,9 @@ class TestCustomModeTokenLoading:
                 "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.test_token",
                 "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.refresh_token",
                 "token_type": "Bearer",
-                "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+                "expires_at": (
+                    datetime.now(timezone.utc) + timedelta(hours=24)
+                ).isoformat(),
                 "scope": "contacts.readonly contacts.write conversations.readonly conversations.write",
                 "user_type": "Company",
             }
@@ -114,7 +116,9 @@ OAUTH_SERVER_PORT=8080
             "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.expired_token",
             "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.refresh_token",
             "token_type": "Bearer",
-            "expires_at": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),  # Expired
+            "expires_at": (
+                datetime.now(timezone.utc) - timedelta(hours=1)
+            ).isoformat(),  # Expired
             "scope": "contacts.readonly contacts.write conversations.readonly conversations.write",
             "user_type": "Company",
         }
@@ -167,7 +171,9 @@ OAUTH_SERVER_PORT=8080
             "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.test_token",
             "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.refresh_token",
             "token_type": "Bearer",
-            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+            "expires_at": (
+                datetime.now(timezone.utc) + timedelta(hours=24)
+            ).isoformat(),
             "scope": "contacts.readonly contacts.write conversations.readonly conversations.write",
             "user_type": "Company",
         }
@@ -183,7 +189,11 @@ OAUTH_SERVER_PORT=8080
                 "GHL_CLIENT_ID": "test_client",
                 "GHL_CLIENT_SECRET": "test_secret",
             },
-        ), patch("webbrowser.open") as mock_browser, patch("aiohttp.web.TCPSite") as mock_tcpsite, patch("aiohttp.web.AppRunner") as mock_runner:
+        ), patch("webbrowser.open"), patch(
+            "aiohttp.web.TCPSite"
+        ) as mock_tcpsite, patch(
+            "aiohttp.web.AppRunner"
+        ) as mock_runner:
             # Mock the TCPSite to avoid binding to a real port
             mock_tcpsite_instance = AsyncMock()
             mock_tcpsite.return_value = mock_tcpsite_instance
@@ -205,7 +215,9 @@ OAUTH_SERVER_PORT=8080
             oauth_service.settings.ghl_client_secret = "test_secret_456"
 
             # Mock the _run_callback_server method to avoid actual server creation
-            oauth_service._run_callback_server = AsyncMock(return_value=auth_code_future)
+            oauth_service._run_callback_server = AsyncMock(
+                return_value=auth_code_future
+            )
 
             # Mock load_token to return a valid token
             stored_token = StoredToken(
