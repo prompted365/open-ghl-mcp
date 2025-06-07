@@ -41,7 +41,31 @@ class OAuthSettings(BaseSettings):
     oauth_server_port: int = 8080
     token_storage_path: str = "./config/tokens.json"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    @classmethod
+    def get_env_file_path(cls):
+        """Get absolute path to .env file"""
+        from pathlib import Path
+
+        return Path(__file__).parent.parent.parent / ".env"
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    def __init__(self, **data):
+        # Load .env file manually with absolute path
+        from pathlib import Path
+        from dotenv import load_dotenv
+
+        project_root = Path(__file__).parent.parent.parent
+        env_file_path = project_root / ".env"
+
+        # Load .env file if it exists
+        if env_file_path.exists():
+            load_dotenv(env_file_path)
+
+        super().__init__(**data)
+
+        # Update token storage path to be absolute
+        self.token_storage_path = str(project_root / "config" / "tokens.json")
 
     def model_post_init(self, __context):
         """Validate required fields based on auth mode"""
@@ -221,22 +245,51 @@ class OAuthService:
 
     # Valid GoHighLevel scopes (using dots as separators)
     ALL_SCOPES = [
+        "contacts.readonly",
+        "contacts.write",
         "conversations.readonly",
         "conversations.write",
         "conversations/message.readonly",
         "conversations/message.write",
-        "conversations/reports.readonly",
-        "conversations/livechat.write",
-        "contacts.readonly",
-        "contacts.write",
+        "locations.readonly",
     ]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings = OAuthSettings()
         self.client = httpx.AsyncClient()
         self.callback_server = None
-        self._auth_code_future = None
+        self._auth_code_future: Optional[asyncio.Future[str]] = None
         self._location_tokens: Dict[str, StoredToken] = {}  # Cache for location tokens
+        self._standard_auth: Optional[StandardAuthService] = None  # Initialize as None
+
+        # Debug environment and settings
+        from pathlib import Path
+
+        # Use absolute path based on module location instead of cwd
+        # Go up from src/services/oauth.py to project root
+        project_root = Path(__file__).parent.parent.parent
+        env_file = project_root / ".env"
+        tokens_file = project_root / "config" / "tokens.json"
+
+        # Force custom mode if we have custom mode files, regardless of env detection
+        # The presence of tokens.json is a definitive indicator of custom mode
+        if tokens_file.exists() and self.settings.auth_mode == AuthMode.STANDARD:
+            print(
+                "DEBUG: FORCING custom mode - tokens.json exists but auth_mode was standard"
+            )
+            self.settings.auth_mode = AuthMode.CUSTOM
+
+        # Also force custom mode if we have both .env and credentials
+        elif (
+            env_file.exists()
+            and self.settings.ghl_client_id
+            and self.settings.ghl_client_secret
+            and self.settings.auth_mode == AuthMode.STANDARD
+        ):
+            print(
+                "DEBUG: FORCING custom mode - .env with credentials exists but auth_mode was standard"
+            )
+            self.settings.auth_mode = AuthMode.CUSTOM
 
         # Initialize standard auth service if in standard mode
         if self.settings.auth_mode == AuthMode.STANDARD:
@@ -400,11 +453,11 @@ class OAuthService:
 
         return TokenResponse(**response.json())
 
-    async def _run_callback_server(self, expected_state: str) -> asyncio.Future:
+    async def _run_callback_server(self, expected_state: str) -> asyncio.Future[str]:
         """Run a temporary server to receive the OAuth callback"""
         from aiohttp import web
 
-        self._auth_code_future = asyncio.Future()
+        self._auth_code_future = asyncio.Future[str]()
 
         async def handle_callback(request):
             print(f"Received callback request: {request.url}")
@@ -461,6 +514,7 @@ class OAuthService:
             await self._auth_code_future
             await asyncio.sleep(2)  # Give time for response
             await runner.cleanup()
+            return None
 
         asyncio.create_task(cleanup())
 
@@ -472,9 +526,14 @@ class OAuthService:
         """Get location-specific access token"""
         # Use standard auth if available
         if self.settings.auth_mode == AuthMode.STANDARD:
+            if not self._standard_auth:
+                raise Exception(
+                    f"Standard auth service not initialized but auth_mode is {self.settings.auth_mode}"
+                )
             return await self._standard_auth.get_location_token(location_id)
 
         # Custom mode logic
+
         # Check cache first
         if not force_refresh and location_id in self._location_tokens:
             cached_token = self._location_tokens[location_id]

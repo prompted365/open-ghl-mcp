@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch, AsyncMock, mock_open
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import base64
 
 from src.services.oauth import (
     OAuthService,
@@ -42,10 +43,10 @@ class TestOAuthServiceStandardMode:
         location_id = "test_location"
         expected_token = "location_token_123"
 
-        # Mock the standard auth service
-        oauth_service_standard._standard_auth.get_location_token.return_value = (
-            expected_token
-        )
+        # Ensure we're in standard mode
+        oauth_service_standard.settings.auth_mode = AuthMode.STANDARD
+        oauth_service_standard._standard_auth = AsyncMock()
+        oauth_service_standard._standard_auth.get_location_token = AsyncMock(return_value=expected_token)
 
         token = await oauth_service_standard.get_location_token(location_id)
 
@@ -59,10 +60,10 @@ class TestOAuthServiceStandardMode:
         """Test getting company token in standard mode"""
         expected_token = "company_token_123"
 
-        # Mock the standard auth service
-        oauth_service_standard._standard_auth.get_company_token.return_value = (
-            expected_token
-        )
+        # Ensure we're in standard mode
+        oauth_service_standard.settings.auth_mode = AuthMode.STANDARD
+        oauth_service_standard._standard_auth = AsyncMock()
+        oauth_service_standard._standard_auth.get_company_token = AsyncMock(return_value=expected_token)
 
         token = await oauth_service_standard.get_company_token()
 
@@ -106,6 +107,10 @@ class TestOAuthServiceCustomMode:
     @pytest.mark.asyncio
     async def test_load_token_no_file_custom(self, oauth_service_custom):
         """Test loading token when file doesn't exist"""
+        # Ensure we're in custom mode
+        oauth_service_custom.settings.auth_mode = AuthMode.CUSTOM
+        oauth_service_custom.settings.token_storage_path = "/nonexistent/path/tokens.json"
+
         token = await oauth_service_custom.load_token()
         assert token is None
 
@@ -230,7 +235,7 @@ class TestStandardAuthService:
     async def test_get_company_token_from_cache(self, auth_service):
         """Test getting company token from cache"""
         # Set up cache with non-expired token
-        future_time = datetime.now() + timedelta(hours=1)
+        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
         auth_service._company_token_cache = {
             "access_token": "cached_company_token",
             "expires_at": future_time.isoformat(),
@@ -251,7 +256,7 @@ class TestStandardAuthService:
         mock_response.json.return_value = {
             "access_token": "new_company_token",
             "refresh_token": "refresh_token",
-            "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
             "token_type": "Bearer",
         }
 
@@ -306,8 +311,6 @@ class TestStandardAuthService:
     @pytest.mark.asyncio
     async def test_get_location_token_with_jwt_parsing(self, auth_service):
         """Test getting location token with JWT parsing and caching"""
-        import base64
-
         location_id = "test_location"
 
         # Create mock JWT with company ID
@@ -344,7 +347,7 @@ class TestStandardAuthService:
         location_id = "cached_location"
 
         # Set up cache with non-expired token
-        future_time = datetime.now() + timedelta(minutes=30)
+        future_time = datetime.now(timezone.utc) + timedelta(minutes=30)
         auth_service._location_token_cache = {
             location_id: {
                 "access_token": "cached_location_token",

@@ -42,11 +42,12 @@ class StandardModeSetup:
         """Check if this is the first time running the server"""
         # Check for any configuration files
         standard_config = self.config_dir / "standard_config.json"
-        custom_env = Path(".env")
         first_run_marker = self.config_dir / ".first_run_complete"
 
         return not (
-            standard_config.exists() or custom_env.exists() or first_run_marker.exists()
+            standard_config.exists()
+            or self.env_file.exists()
+            or first_run_marker.exists()
         )
 
     def mark_first_run_complete(self) -> None:
@@ -54,6 +55,23 @@ class StandardModeSetup:
         self.config_dir.mkdir(exist_ok=True)
         marker_file = self.config_dir / ".first_run_complete"
         marker_file.touch()
+
+    def save_custom_mode_choice(self) -> None:
+        """Save that user chose custom mode (for incomplete setups)"""
+        self.config_dir.mkdir(exist_ok=True)
+        marker_file = self.config_dir / ".custom_mode_chosen"
+        marker_file.touch()
+
+    def was_custom_mode_chosen(self) -> bool:
+        """Check if user previously chose custom mode"""
+        marker_file = self.config_dir / ".custom_mode_chosen"
+        return marker_file.exists()
+
+    def clear_custom_mode_choice(self) -> None:
+        """Clear custom mode choice marker (when setup is complete)"""
+        marker_file = self.config_dir / ".custom_mode_chosen"
+        if marker_file.exists():
+            marker_file.unlink()
 
     def check_auth_status(self) -> Tuple[bool, str]:
         """Check if we have valid authentication configured"""
@@ -70,10 +88,9 @@ class StandardModeSetup:
                 pass
 
         # Check for custom mode (.env file)
-        env_file = Path(".env")
-        if env_file.exists():
+        if self.env_file.exists():
             try:
-                with open(env_file, "r") as f:
+                with open(self.env_file, "r") as f:
                     content = f.read()
                 if "GHL_CLIENT_ID=" in content and "GHL_CLIENT_SECRET=" in content:
                     return True, "Custom mode configured"
@@ -176,7 +193,7 @@ class StandardModeSetup:
             else:
                 print("Please enter 1 or 2.")
 
-    def interactive_custom_setup(self) -> bool:
+    async def interactive_custom_setup(self) -> bool:
         """Interactive setup for custom mode"""
         print("\n🔧 Custom Mode Setup\n")
 
@@ -191,15 +208,15 @@ class StandardModeSetup:
                 .lower()
             )
             if has_app in ["y", "yes"]:
-                return self._collect_custom_credentials()
+                return await self._collect_custom_credentials()
             elif has_app in ["n", "no"]:
                 self._show_marketplace_app_instructions()
                 return False
             else:
                 print("Please enter 'y' for yes or 'n' for no.")
 
-    def _collect_custom_credentials(self) -> bool:
-        """Collect and save custom credentials"""
+    async def _collect_custom_credentials(self) -> bool:
+        """Collect custom credentials and complete OAuth flow"""
         print("\n📋 Enter Your Marketplace App Credentials\n")
 
         try:
@@ -226,24 +243,43 @@ OAUTH_SERVER_PORT=8080
 """
 
             # Write .env file
-            env_file = Path(".env")
-            with open(env_file, "w") as f:
+            with open(self.env_file, "w") as f:
                 f.write(env_content)
 
             print("✅ Configuration saved to .env file!")
-            print("🎉 Custom mode setup complete!")
-            print(
-                "\n🛑 Server will now exit. Restart to use your custom configuration:"
-            )
-            print("   python -m src.main\n")
 
-            return True
+            # Now run the OAuth flow to get tokens
+            print("\n🔐 Starting OAuth authorization...")
+            print("📱 Please:")
+            print("   • Authorize the app in the browser window that opens")
+            print("   • Complete the authorization process")
+            print("   • Return here when done\n")
+
+            # Import here to avoid circular imports
+            from ..services.oauth import OAuthService
+
+            # Initialize OAuth service (it will read the .env file we just created)
+            oauth_service = OAuthService()
+
+            # Run the OAuth flow
+            stored_token = await oauth_service.authenticate()
+
+            if stored_token:
+                print("✅ OAuth authorization successful!")
+                print("💾 Access tokens saved!")
+                print("🎉 Custom mode setup complete!")
+                return True
+            else:
+                print("❌ OAuth authorization failed.")
+                print("   Please check your credentials and try again.")
+                return False
 
         except KeyboardInterrupt:
             print("\n\n⏹️  Setup cancelled by user.")
             return False
         except Exception as e:
-            print(f"\n❌ Error saving configuration: {e}")
+            print(f"\n❌ Error during OAuth setup: {e}")
+            print("   Please check your credentials and try again.")
             return False
 
     def _show_marketplace_app_instructions(self) -> None:
@@ -263,7 +299,8 @@ OAUTH_SERVER_PORT=8080
         print("   • conversations.readonly")
         print("   • conversations.write")
         print("   • conversations/message.readonly")
-        print("   • conversations/message.write\n")
+        print("   • conversations/message.write")
+        print("   • locations.readonly")
 
         print("💡 Need help? Check the README for detailed instructions.")
         print("🔗 https://github.com/basicmachines-co/open-ghl-mcp/blob/main/README.md")
@@ -367,11 +404,10 @@ OAUTH_SERVER_PORT=8080
             return False
 
         # Check if we're in custom mode
-        env_file = Path(".env")
-        if env_file.exists():
+        if self.env_file.exists():
             # Custom mode - just check that .env file has required fields
             try:
-                with open(env_file, "r") as f:
+                with open(self.env_file, "r") as f:
                     content = f.read()
                 if "GHL_CLIENT_ID=" in content and "GHL_CLIENT_SECRET=" in content:
                     return True

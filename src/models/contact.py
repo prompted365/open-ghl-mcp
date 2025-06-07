@@ -61,8 +61,7 @@ class Contact(BaseModel):
     additionalEmails: Optional[List[ContactEmail]] = None
     additionalPhones: Optional[List[ContactPhone]] = None
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True}
 
 
 class ContactCreate(BaseModel):

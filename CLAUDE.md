@@ -13,6 +13,9 @@ Always use the official API docs at https://highlevel.stoplight.io/docs/integrat
 
 Only use API v2. Do not use API v1 or refer to API v1 documentation.
 
+## Coding
+- **Imports** - Place all imports at the top of the file
+
 ## Testing
 If you need to test the MCP server with real GoHighLevel accounts, check for TESTING_INSTRUCTIONS.md in the project root. This file contains specific testing accounts and instructions but is not committed to the repository.
 
@@ -76,6 +79,15 @@ The MCP server follows a modular architecture:
    - Git for source control
    - GitHub Actions for CI/CD
    - Tests run on every push
+
+6. **Testing** (`tests/*`)
+   - Put tests in the tests/ directory
+   - Run all of the checks with the tests: `uv run black src/ tests/ && uv run flake8 src/ tests/ && uv run mypy src/ --ignore-missing-imports`
+   - To test interactive server startup flows (like setup wizards), use piped input: `echo -e "2\ny\nclient_id\nclient_secret" | uv run python -m src.main`
+     - The server detects if it's running interactively vs being managed by Claude Desktop
+     - Interactive mode shows setup wizards and configuration instructions
+     - When run by Claude Desktop, it operates as an MCP server without interactive prompts
+   - When searching for the Claude Desktop config check the default folder paths before searching the entire disk
 
 ## Key Implementation Details
 

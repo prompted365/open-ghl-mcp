@@ -3,6 +3,7 @@
 
 import asyncio
 import os
+import sys
 from typing import Optional, Dict, Any, List
 
 from fastmcp import FastMCP
@@ -22,6 +23,8 @@ from .models.conversation import (
 
 async def startup_check_and_setup():
     """Check authentication status and run setup if needed"""
+    from pathlib import Path
+
     print("🔧 Basic Machines -> GoHighLevel MCP Server")
     print("   Version 0.1.0")
 
@@ -32,19 +35,36 @@ async def startup_check_and_setup():
             chosen_mode = setup.choose_auth_mode()
 
             if chosen_mode == "custom":
-                # Custom mode chosen - run interactive setup
-                custom_setup_success = setup.interactive_custom_setup()
+                # Custom mode chosen - save this choice and run interactive setup
+                setup.save_custom_mode_choice()
+                custom_setup_success = await setup.interactive_custom_setup()
                 setup.mark_first_run_complete()
 
                 if custom_setup_success:
-                    # Credentials collected and .env created
-                    return "exit_after_custom_setup"
+                    # Credentials collected and .env created, clear the choice marker
+                    setup.clear_custom_mode_choice()
+                    # Jump directly to Claude Desktop instructions (skip wizard)
+                    # Continue to show Claude Desktop instructions section
                 else:
                     # User needs to create app first or cancelled
+                    # Keep the choice marker so they continue with custom mode on restart
                     return "exit_after_custom_instructions"
+            else:
+                # Standard mode chosen - continue with setup
+                print("📋 Continuing with Standard Mode setup...\n")
 
-            # Standard mode chosen - continue with setup
-            print("📋 Continuing with Standard Mode setup...\n")
+                # Standard mode setup wizard
+                setup_success = await setup.interactive_setup()
+
+                if not setup_success:
+                    print("❌ Setup was not completed successfully.")
+                    print(
+                        "   The MCP server cannot start without valid authentication."
+                    )
+                    print("   Please run the server again to retry setup.\n")
+                    return False
+
+                # Standard setup completed successfully, continue to Claude instructions
         else:
             # Not first run - check existing auth status
             auth_valid, message = setup.check_auth_status()
@@ -63,33 +83,33 @@ async def startup_check_and_setup():
                     print("   Your setup token may have expired or become invalid.")
                     print("🚀 Re-running setup wizard...\n")
 
-        # Run setup wizard based on current mode
-        auth_valid, message = setup.check_auth_status()
+            # Run setup wizard based on current mode
+            auth_valid, message = setup.check_auth_status()
 
-        # Check if we're in custom mode (has .env file)
-        from pathlib import Path
+            # Check if we're in custom mode (has .env file OR user previously chose custom)
+            if setup.env_file.exists() or setup.was_custom_mode_chosen():
+                # Custom mode - re-run custom setup
+                print("🔧 Re-running Custom Mode setup...\n")
+                custom_setup_success = await setup.interactive_custom_setup()
 
-        env_file = Path(".env")
-
-        if env_file.exists():
-            # Custom mode - re-run custom setup
-            print("🔧 Re-running Custom Mode setup...\n")
-            custom_setup_success = setup.interactive_custom_setup()
-
-            if custom_setup_success:
-                return "exit_after_custom_setup"
+                if custom_setup_success:
+                    # Clear the choice marker since setup is now complete
+                    setup.clear_custom_mode_choice()
+                    # Continue to show Claude Desktop instructions
+                else:
+                    return "exit_after_custom_instructions"
             else:
-                return "exit_after_custom_instructions"
-        else:
-            # Standard mode - run standard setup
-            print("📋 Running Standard Mode setup...\n")
-            setup_success = await setup.interactive_setup()
+                # Standard mode - run standard setup
+                print("📋 Running Standard Mode setup...\n")
+                setup_success = await setup.interactive_setup()
 
-            if not setup_success:
-                print("❌ Setup was not completed successfully.")
-                print("   The MCP server cannot start without valid authentication.")
-                print("   Please run the server again to retry setup.\n")
-                return False
+                if not setup_success:
+                    print("❌ Setup was not completed successfully.")
+                    print(
+                        "   The MCP server cannot start without valid authentication."
+                    )
+                    print("   Please run the server again to retry setup.\n")
+                    return False
 
         # Setup completed successfully - show Claude Desktop instructions
         print("\n" + "=" * 60)
@@ -135,9 +155,6 @@ async def startup_check_and_setup():
         )
         print("4. Save the configuration and restart Claude Desktop")
         print("\n✅ Your GoHighLevel MCP server is now configured!")
-        print("   The server will automatically start when you use Claude Desktop.")
-        print("\n🛑 This setup process is complete. The server will now exit.")
-        print("   Claude Desktop will manage the server lifecycle from now on.\n")
 
         # Exit after successful setup
         return "exit_after_setup"
@@ -626,6 +643,78 @@ async def update_message_status(params: UpdateMessageStatusParams) -> Dict[str, 
     return {"success": True, "message": message.model_dump()}
 
 
+@mcp.tool()
+async def debug_config() -> Dict[str, Any]:
+    """Debug tool to show current MCP server configuration and auth status"""
+    import os
+    from pathlib import Path
+
+    if oauth_service is None:
+        return {"error": "OAuth service not initialized"}
+
+    # Use absolute paths based on module location
+    project_root = Path(__file__).parent.parent
+    cwd = Path.cwd()
+    env_file = project_root / ".env"
+    tokens_file = project_root / "config" / "tokens.json"
+    standard_config_file = project_root / "config" / "standard_config.json"
+
+    # Check token validity
+    token_status = "unknown"
+    token_expires_at = None
+    if tokens_file.exists():
+        try:
+            import json
+            from datetime import datetime
+
+            with open(tokens_file) as f:
+                token_data = json.load(f)
+            expires_at = datetime.fromisoformat(
+                token_data["expires_at"].replace("Z", "+00:00")
+            )
+            now = datetime.now(expires_at.tzinfo)
+            token_status = "valid" if expires_at > now else "expired"
+            token_expires_at = token_data["expires_at"]
+        except Exception as e:
+            token_status = f"error: {e}"
+
+    return {
+        "environment": {
+            "working_directory": str(cwd),
+            "project_root": str(project_root),
+            "python_executable": sys.executable,
+            "auth_mode_env_var": os.environ.get("AUTH_MODE", "NOT_SET"),
+            "ghl_client_id_env_var": (
+                os.environ.get("GHL_CLIENT_ID", "NOT_SET")[:10] + "..."
+                if os.environ.get("GHL_CLIENT_ID")
+                else "NOT_SET"
+            ),
+        },
+        "files": {
+            "env_file_exists": env_file.exists(),
+            "tokens_json_exists": tokens_file.exists(),
+            "standard_config_json_exists": standard_config_file.exists(),
+        },
+        "oauth_service": {
+            "auth_mode": str(oauth_service.settings.auth_mode),
+            "ghl_client_id": (
+                oauth_service.settings.ghl_client_id[:10] + "..."
+                if oauth_service.settings.ghl_client_id
+                else None
+            ),
+            "has_ghl_client_secret": bool(oauth_service.settings.ghl_client_secret),
+            "supabase_url": oauth_service.settings.supabase_url,
+            "has_supabase_access_key": bool(oauth_service.settings.supabase_access_key),
+            "standard_auth_service_initialized": oauth_service._standard_auth
+            is not None,
+        },
+        "token_status": {
+            "custom_token_status": token_status,
+            "custom_token_expires_at": token_expires_at,
+        },
+    }
+
+
 # Resources
 
 
@@ -787,8 +876,6 @@ def main():
     """Main function with startup check and setup"""
 
     # Check if we're running in MCP mode (no TTY) vs manual mode (with TTY)
-    import sys
-
     is_mcp_mode = not sys.stdin.isatty()
 
     if is_mcp_mode:
