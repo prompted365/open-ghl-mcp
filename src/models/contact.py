@@ -132,8 +132,8 @@ class ContactListMeta(BaseModel):
     startAfterId: Optional[str] = None
     startAfter: Optional[int] = None
     currentPage: Optional[int] = None
-    nextPage: Optional[int] = None
-    prevPage: Optional[int] = None
+    nextPage: Optional[str] = None  # Can be empty string or integer string
+    prevPage: Optional[str] = None  # Can be None or integer string
 
 
 class ContactList(BaseModel):
