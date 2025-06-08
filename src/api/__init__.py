@@ -6,6 +6,7 @@ from .contacts import ContactsClient
 from .conversations import ConversationsClient
 from .opportunities import OpportunitiesClient
 from .calendars import CalendarsClient
+from .forms import FormsClient
 
 __all__ = [
     "GoHighLevelClient",
@@ -14,4 +15,5 @@ __all__ = [
     "ConversationsClient",
     "OpportunitiesClient",
     "CalendarsClient",
+    "FormsClient",
 ]

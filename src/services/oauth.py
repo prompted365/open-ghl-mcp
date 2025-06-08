@@ -259,7 +259,7 @@ class OAuthService:
         "calendars/events.readonly",
         "calendars/events.write",
         "forms.readonly",
-        "forms.write"
+        "forms.write",
     ]
 
     def __init__(self) -> None:

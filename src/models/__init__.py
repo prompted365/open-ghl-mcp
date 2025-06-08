@@ -11,6 +11,20 @@ from .conversation import (
     MessageStatus,
     MessageDirection,
 )
+from .form import (
+    Form,
+    FormField,
+    FormSettings,
+    FormList,
+    FormSubmission,
+    FormSubmissionData,
+    FormSubmissionList,
+    FormSubmitRequest,
+    FormSubmitResponse,
+    FormFileUploadRequest,
+    FormSearchParams,
+    FormSubmissionSearchParams,
+)
 
 __all__ = [
     # Auth models
@@ -31,4 +45,17 @@ __all__ = [
     "MessageType",
     "MessageStatus",
     "MessageDirection",
+    # Form models
+    "Form",
+    "FormField",
+    "FormSettings",
+    "FormList",
+    "FormSubmission",
+    "FormSubmissionData",
+    "FormSubmissionList",
+    "FormSubmitRequest",
+    "FormSubmitResponse",
+    "FormFileUploadRequest",
+    "FormSearchParams",
+    "FormSubmissionSearchParams",
 ]

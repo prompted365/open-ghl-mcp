@@ -8,8 +8,6 @@ from src.api.client import GoHighLevelClient
 from src.models.contact import Contact, ContactCreate, ContactList
 from src.models.conversation import MessageCreate, MessageType, Message
 from src.utils.exceptions import (
-    AuthenticationError,
-    ResourceNotFoundError,
     DuplicateResourceError,
 )
 

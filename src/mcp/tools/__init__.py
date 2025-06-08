@@ -5,3 +5,4 @@ from .contacts import *
 from .conversations import *
 from .opportunities import *
 from .calendars import *
+from .forms import *

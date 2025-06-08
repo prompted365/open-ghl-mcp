@@ -31,11 +31,17 @@ from ..models.calendar import (
     CalendarList,
     FreeSlotsResult,
 )
+from ..models.form import (
+    FormList,
+    FormSubmissionList,
+    FormFileUploadRequest,
+)
 
 from .contacts import ContactsClient
 from .conversations import ConversationsClient
 from .opportunities import OpportunitiesClient
 from .calendars import CalendarsClient
+from .forms import FormsClient
 
 
 class GoHighLevelClient:
@@ -53,6 +59,7 @@ class GoHighLevelClient:
         self._conversations = ConversationsClient(oauth_service)
         self._opportunities = OpportunitiesClient(oauth_service)
         self._calendars = CalendarsClient(oauth_service)
+        self._forms = FormsClient(oauth_service)
 
     async def __aenter__(self):
         # Enter all specialized clients
@@ -60,6 +67,7 @@ class GoHighLevelClient:
         await self._conversations.__aenter__()
         await self._opportunities.__aenter__()
         await self._calendars.__aenter__()
+        await self._forms.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -68,6 +76,7 @@ class GoHighLevelClient:
         await self._conversations.__aexit__(exc_type, exc_val, exc_tb)
         await self._opportunities.__aexit__(exc_type, exc_val, exc_tb)
         await self._calendars.__aexit__(exc_type, exc_val, exc_tb)
+        await self._forms.__aexit__(exc_type, exc_val, exc_tb)
 
     # Location Methods (keeping these in main client for now)
 
@@ -311,3 +320,32 @@ class GoHighLevelClient:
         return await self._calendars.get_free_slots(
             calendar_id, location_id, start_date, end_date, timezone
         )
+
+    # Form Methods - Delegate to FormsClient
+
+    async def get_forms(
+        self, location_id: str, limit: int = 100, skip: int = 0
+    ) -> FormList:
+        """Get all forms for a location"""
+        return await self._forms.get_forms(location_id, limit, skip)
+
+    async def get_all_submissions(
+        self,
+        location_id: str,
+        form_id: Optional[str] = None,
+        contact_id: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 100,
+        skip: int = 0,
+    ) -> FormSubmissionList:
+        """Get all form submissions for a location"""
+        return await self._forms.get_all_submissions(
+            location_id, form_id, contact_id, start_date, end_date, limit, skip
+        )
+
+    async def upload_form_file(
+        self, file_upload: FormFileUploadRequest
+    ) -> Dict[str, Any]:
+        """Upload a file to a form's custom field"""
+        return await self._forms.upload_form_file(file_upload)

@@ -444,7 +444,7 @@ OAUTH_SERVER_PORT=8080
     def show_claude_desktop_instructions(self) -> None:
         """Show Claude Desktop configuration instructions"""
         import os
-        
+
         print("\n" + "=" * 60)
         print("🎯 Next Step: Configure Claude Desktop")
         print("=" * 60)

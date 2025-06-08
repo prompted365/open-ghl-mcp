@@ -459,3 +459,138 @@ The following scopes are required for calendar functionality:
 
 ### Datetime Handling
 The calendar API uses ISO 8601 datetime format with timezone information. The Pydantic models automatically handle conversion between ISO strings and Python datetime objects. Always provide timezone-aware datetimes for appointment scheduling to avoid conflicts.
+
+## Forms & Submissions System Implementation Guide
+
+### Critical: Forms Management System
+The MCP server now includes full support for GoHighLevel's forms and submissions system:
+
+#### Core Forms Endpoints
+- **GET /forms**: List all forms for location
+- **GET /forms/{id}**: Get specific form with field structure
+- **GET /forms/{id}/submissions**: Get submissions for specific form
+- **GET /forms/submissions**: Get all form submissions with filtering
+- **POST /forms/submit**: Submit form data (unauthenticated, mimics website)
+- **POST /forms/upload-custom-files**: Upload files to custom fields
+
+### Form JSON Structure
+Standard form object structure:
+```json
+{
+  "id": "form-id",
+  "name": "Contact Form",
+  "locationId": "location-id",
+  "description": "Lead generation form",
+  "isActive": true,
+  "fields": [
+    {
+      "id": "firstName",
+      "label": "First Name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "id": "custom_field_abc123",
+      "label": "Interest Level",
+      "type": "dropdown",
+      "options": ["Low", "Medium", "High"],
+      "required": false
+    }
+  ],
+  "thankYouMessage": "Thanks for submitting!",
+  "redirectUrl": "https://example.com/thank-you"
+}
+```
+
+### Form Submission Structure
+```json
+{
+  "formId": "form-id",
+  "locationId": "location-id",
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john@example.com",
+  "phone": "+1234567890",
+  "custom_field_abc123": "High"
+}
+```
+
+### MCP Tools Available
+- `get_forms`: List all forms for location (returns only id, name, locationId)
+- `get_all_form_submissions`: Get all submissions across all forms with filtering
+- `upload_form_file`: Upload file to custom field (requires contact ID)
+
+**NOTE**: The following endpoints are NOT supported by the GoHighLevel API:
+- `GET /forms/{id}` - Returns 401 "This route is not yet supported by the IAM Service"
+- `GET /forms/{id}/submissions` - Returns 404 Not Found  
+- `POST /forms/submit` - Returns 401 Unauthorized (both authenticated and unauthenticated versions)
+
+### Key Implementation Details
+
+#### Form Submission Approach
+- **Unauthenticated endpoint**: Uses `https://backend.leadconnectorhq.com/forms/submit`
+- **Mimics real visitors**: No API token required, just like website forms
+- **Automatic contact creation**: Submissions create/update contacts
+- **Attribution tracking**: Captures lead source data
+
+#### Custom Fields
+- Custom fields have random IDs (e.g., "IvYfCvMkhGap6sTe1Uql")
+- Use `get_form` to discover field IDs and structure
+- Pass custom field values in the `custom_fields` dictionary
+- Custom fields are flattened into the submission data
+
+#### File Uploads
+- Files are passed as base64-encoded strings
+- Supports multipart form data upload
+- Requires contact ID and field ID
+- Common for document collection in forms
+
+### Common API Error Patterns
+- **"Form not found"**: Invalid formId for location
+- **"Required field missing"**: Check form structure for required fields
+- **"Invalid custom field"**: Verify field ID exists in form
+- **"File too large"**: Check file size limits
+
+### Field Types
+- `text`: Plain text input
+- `email`: Email with validation
+- `phone`: Phone number with formatting
+- `textarea`: Multi-line text
+- `dropdown`: Select with options
+- `checkbox`: Single checkbox
+- `radio`: Radio button group
+- `file`: File upload field
+- `date`: Date picker
+- `number`: Numeric input
+
+### Business Logic Notes
+- Forms are the primary lead generation tool in GoHighLevel
+- Every submission creates an activity in the contact timeline
+- Forms can trigger automation workflows
+- Custom fields enable business-specific data collection
+- Form analytics track conversion rates
+
+### OAuth Scopes Required
+The following scopes are required for forms functionality:
+- `forms.readonly` - Required for GET operations
+- `forms.write` - Required for CREATE operations and file uploads
+
+**IMPORTANT**: If you get authorization errors, you need to re-authorize your GoHighLevel app with the updated scopes. Delete `config/tokens.json` and run the MCP server again to trigger the OAuth flow with the new scopes.
+
+### Testing Forms
+To test form submission like a website visitor would:
+```python
+# Example: "Claude, test form ABC123 with name John Doe and email john@example.com"
+# 1. First get the form structure
+form = await get_form(form_id="ABC123", location_id="location_id")
+
+# 2. Submit the form
+result = await submit_form(
+    form_id="ABC123",
+    location_id="location_id",
+    first_name="John",
+    last_name="Doe",
+    email="john@example.com",
+    custom_fields={"field_id": "value"}
+)
+```

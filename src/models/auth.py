@@ -66,10 +66,10 @@ class StoredToken(BaseModel):
         # Ensure we're always comparing timezone-aware datetimes
         now = datetime.now(timezone.utc)
         buffer_time = now + timedelta(seconds=buffer_seconds)
-        
+
         # Make sure expires_at is timezone-aware
         expires_at = self.expires_at
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
-        
+
         return buffer_time >= expires_at

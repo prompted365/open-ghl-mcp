@@ -10,6 +10,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 - 🏢 **Multi-location Support**: Works with agency accounts to manage multiple sub-accounts
 - 👥 **Contact Management**: Complete CRUD operations for contacts
 - 💬 **Conversations**: Search conversations, view messages, and manage messaging
+- 📝 **Forms & Submissions**: List forms, view submissions, test form submissions like a website visitor
 - 🏷️ **Tag Management**: Add and remove tags from contacts
 - 🔄 **Automatic Token Refresh**: Handles token expiration seamlessly
 - 🛠️ **MCP Tools & Resources**: Both tools and resources for flexible integration
@@ -108,6 +109,16 @@ python -m src.main
 - `get_messages` - Get messages from a conversation
 - `send_message` - Send messages (SMS ✅, Email ✅, WhatsApp, IG, FB, Custom, Live_Chat)
 - `update_message_status` - Update message delivery status
+
+#### Forms Management
+- `get_forms` - List all forms for a location (basic info only: id, name, locationId)
+- `get_all_form_submissions` - Get all form submissions across all forms with filtering
+- `upload_form_file` - Upload file to a form's custom field (requires contact ID)
+
+Note: The GoHighLevel API has limited forms support. The following are NOT available:
+- Getting detailed form structure with fields
+- Getting submissions for a specific form
+- Submitting forms programmatically
 
 #### Available Resources
 - `contacts://{location_id}` - List all contacts for a location

@@ -125,7 +125,7 @@ class ContactUpdate(BaseModel):
 
 class ContactListMeta(BaseModel):
     """Pagination metadata for contact list"""
-    
+
     total: int
     nextPageUrl: Optional[str] = None
     startAfterId: Optional[str] = None

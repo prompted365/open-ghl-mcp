@@ -90,7 +90,7 @@ class ContactsClient(BaseGoHighLevelClient):
         self, contact_id: str, tags: List[str], location_id: str
     ) -> Contact:
         """Add tags to a contact"""
-        response = await self._request(
+        await self._request(
             "POST",
             f"/contacts/{contact_id}/tags",
             json={"tags": tags},
@@ -104,7 +104,7 @@ class ContactsClient(BaseGoHighLevelClient):
         self, contact_id: str, tags: List[str], location_id: str
     ) -> Contact:
         """Remove tags from a contact"""
-        response = await self._request(
+        await self._request(
             "DELETE",
             f"/contacts/{contact_id}/tags",
             json={"tags": tags},
