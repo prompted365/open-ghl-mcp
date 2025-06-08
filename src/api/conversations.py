@@ -55,7 +55,8 @@ class ConversationsClient(BaseGoHighLevelClient):
             "GET", f"/conversations/{conversation_id}", location_id=location_id
         )
         data = response.json()
-        return Conversation(**data.get("conversation", data))
+        # API returns the conversation directly, not wrapped
+        return Conversation(**data)
 
     async def create_conversation(
         self, conversation: ConversationCreate
@@ -137,12 +138,12 @@ class ConversationsClient(BaseGoHighLevelClient):
     async def update_message_status(
         self, message_id: str, status: str, location_id: str
     ) -> Message:
-        """Update the status of a message"""
-        response = await self._request(
-            "PUT",
-            f"/conversations/messages/{message_id}/status",
-            json={"status": status},
-            location_id=location_id,
+        """Update the status of a message
+        
+        NOTE: This endpoint is only for custom conversation providers (Marketplace App feature).
+        Regular messages cannot have their status updated via API.
+        """
+        raise NotImplementedError(
+            "Message status updates are only supported for custom conversation providers. "
+            "This is a Marketplace App feature and not available for standard messages."
         )
-        data = response.json()
-        return Message(**data.get("message", data))

@@ -18,8 +18,6 @@ from ..params.opportunities import (
     DeleteOpportunityParams,
     UpdateOpportunityStatusParams,
     GetPipelinesParams,
-    GetPipelineParams,
-    GetPipelineStagesParams,
 )
 
 
@@ -170,7 +168,12 @@ def _register_opportunity_tools(_mcp, _get_client, _oauth_service):
 
     @mcp.tool()
     async def get_pipelines(params: GetPipelinesParams) -> Dict[str, Any]:
-        """Get all pipelines for a location"""
+        """Get all pipelines for a location
+        
+        NOTE: This is the only pipeline endpoint that exists in the API.
+        Individual pipeline and stage endpoints do not exist.
+        Stages are included in each pipeline object.
+        """
         client = await get_client(params.access_token)
 
         pipelines = await client.get_pipelines(params.location_id)
@@ -178,28 +181,6 @@ def _register_opportunity_tools(_mcp, _get_client, _oauth_service):
             "success": True,
             "pipelines": [p.model_dump() for p in pipelines],
             "count": len(pipelines),
-        }
-
-    @mcp.tool()
-    async def get_pipeline(params: GetPipelineParams) -> Dict[str, Any]:
-        """Get a single pipeline by ID"""
-        client = await get_client(params.access_token)
-
-        pipeline = await client.get_pipeline(params.pipeline_id, params.location_id)
-        return {"success": True, "pipeline": pipeline.model_dump()}
-
-    @mcp.tool()
-    async def get_pipeline_stages(params: GetPipelineStagesParams) -> Dict[str, Any]:
-        """Get stages for a specific pipeline"""
-        client = await get_client(params.access_token)
-
-        stages = await client.get_pipeline_stages(
-            params.pipeline_id, params.location_id
-        )
-        return {
-            "success": True,
-            "stages": [s.model_dump() for s in stages],
-            "count": len(stages),
         }
 
     @mcp.tool()

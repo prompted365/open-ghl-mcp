@@ -119,13 +119,16 @@ def _register_conversation_tools(_mcp, _get_client):
     async def update_message_status(
         params: UpdateMessageStatusParams,
     ) -> Dict[str, Any]:
-        """Update the status of a message"""
-        client = await get_client(params.access_token)
-
-        message = await client.update_message_status(
-            message_id=params.message_id,
-            status=params.status,
-            location_id=params.location_id,
-        )
-
-        return {"success": True, "message": message.model_dump()}
+        """Update the status of a message
+        
+        NOTE: This is only supported for custom conversation providers (Marketplace App feature).
+        Regular messages cannot have their status updated via API.
+        """
+        return {
+            "success": False,
+            "error": "Not supported",
+            "message": (
+                "Message status updates are only supported for custom conversation providers. "
+                "This is a Marketplace App feature and not available for standard messages."
+            )
+        }

@@ -65,7 +65,7 @@ class OpportunitiesClient(BaseGoHighLevelClient):
         """Create a new opportunity"""
         response = await self._request(
             "POST",
-            "/opportunities",
+            "/opportunities/",  # Note: API requires trailing slash
             json=opportunity.model_dump(exclude_none=True),
             location_id=opportunity.locationId,
         )
@@ -102,32 +102,24 @@ class OpportunitiesClient(BaseGoHighLevelClient):
         response = await self._request(
             "PUT",
             f"/opportunities/{opportunity_id}/status",
-            json={"locationId": location_id, "status": status},
+            json={"status": status},  # Note: locationId NOT in body
             location_id=location_id,
         )
-        data = response.json()
-        return Opportunity(**data.get("opportunity", data))
+        # Status endpoint returns {"success": true} not opportunity object
+        # Need to fetch the updated opportunity
+        return await self.get_opportunity(opportunity_id, location_id)
 
     async def get_pipelines(self, location_id: str) -> List[Pipeline]:
-        """Get all pipelines for a location"""
-        response = await self._request("GET", "/pipelines", location_id=location_id)
+        """Get all pipelines for a location
+        
+        NOTE: This is the only pipeline endpoint that exists in the API.
+        Individual pipeline and stage endpoints do not exist.
+        """
+        response = await self._request(
+            "GET", 
+            "/opportunities/pipelines", 
+            params={"locationId": location_id},
+            location_id=location_id
+        )
         data = response.json()
         return [Pipeline(**p) for p in data.get("pipelines", [])]
-
-    async def get_pipeline(self, pipeline_id: str, location_id: str) -> Pipeline:
-        """Get a specific pipeline"""
-        response = await self._request(
-            "GET", f"/pipelines/{pipeline_id}", location_id=location_id
-        )
-        data = response.json()
-        return Pipeline(**data.get("pipeline", data))
-
-    async def get_pipeline_stages(
-        self, pipeline_id: str, location_id: str
-    ) -> List[PipelineStage]:
-        """Get stages for a specific pipeline"""
-        response = await self._request(
-            "GET", f"/pipelines/{pipeline_id}/stages", location_id=location_id
-        )
-        data = response.json()
-        return [PipelineStage(**s) for s in data.get("stages", [])]

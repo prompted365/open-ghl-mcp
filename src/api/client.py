@@ -239,18 +239,12 @@ class GoHighLevelClient:
         )
 
     async def get_pipelines(self, location_id: str) -> List[Pipeline]:
-        """Get all pipelines for a location"""
+        """Get all pipelines for a location
+        
+        NOTE: This is the only pipeline endpoint that exists in the API.
+        Individual pipeline and stage endpoints do not exist.
+        """
         return await self._opportunities.get_pipelines(location_id)
-
-    async def get_pipeline(self, pipeline_id: str, location_id: str) -> Pipeline:
-        """Get a specific pipeline"""
-        return await self._opportunities.get_pipeline(pipeline_id, location_id)
-
-    async def get_pipeline_stages(
-        self, pipeline_id: str, location_id: str
-    ) -> List[PipelineStage]:
-        """Get stages for a specific pipeline"""
-        return await self._opportunities.get_pipeline_stages(pipeline_id, location_id)
 
     # Calendar Methods - Delegate to CalendarsClient
 

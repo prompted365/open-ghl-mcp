@@ -37,7 +37,7 @@ class OpportunityCreate(BaseModel):
 
     # Additional fields
     source: Optional[str] = Field(None, description="Source of the opportunity")
-    notes: Optional[str] = Field(None, description="Notes about the opportunity")
+    # NOTE: notes field is not accepted on creation - returns 422 error
     customFields: Optional[List[Dict[str, Any]]] = Field(
         None, description="Custom field values"
     )
@@ -46,7 +46,7 @@ class OpportunityCreate(BaseModel):
 class OpportunityUpdate(BaseModel):
     """Model for updating an opportunity"""
 
-    locationId: str = Field(..., description="Location ID (required for updates)")
+    # NOTE: locationId should NOT be in request body - causes 422 error
     name: Optional[str] = Field(None, description="Opportunity name")
     pipelineStageId: Optional[str] = Field(None, description="Pipeline stage ID")
     status: Optional[OpportunityStatus] = Field(None, description="Opportunity status")
@@ -55,7 +55,7 @@ class OpportunityUpdate(BaseModel):
     )
     assignedTo: Optional[str] = Field(None, description="User ID of the assigned user")
     source: Optional[str] = Field(None, description="Source of the opportunity")
-    notes: Optional[str] = Field(None, description="Notes about the opportunity")
+    # NOTE: notes field is not accepted on updates - returns 422 error
     customFields: Optional[List[Dict[str, Any]]] = Field(
         None, description="Custom field values"
     )
@@ -66,8 +66,33 @@ class Pipeline(BaseModel):
 
     id: str = Field(..., description="Pipeline ID")
     name: str = Field(..., description="Pipeline name")
-    locationId: str = Field(..., description="Location ID")
+    # locationId not returned in list response
     stages: Optional[List["PipelineStage"]] = Field(None, description="Pipeline stages")
+    dateAdded: Optional[Union[datetime, str]] = Field(None, description="Date pipeline was added")
+    dateUpdated: Optional[Union[datetime, str]] = Field(None, description="Date pipeline was updated")
+    originId: Optional[str] = Field(None, description="Origin ID")
+    
+    @field_validator("dateAdded", "dateUpdated", mode="before")
+    @classmethod
+    def parse_datetime(cls, v):
+        """Parse datetime from string or return as-is if already datetime"""
+        if isinstance(v, str):
+            # Handle GoHighLevel datetime format: "2025-06-08T03:01:58.848Z"
+            from datetime import datetime
+            try:
+                if v.endswith("Z"):
+                    # Remove Z and add timezone info
+                    return datetime.fromisoformat(v.replace("Z", "+00:00"))
+                elif "T" in v:
+                    # Try standard ISO format
+                    return datetime.fromisoformat(v)
+                else:
+                    # Fallback for other formats
+                    return datetime.fromisoformat(v)
+            except (ValueError, TypeError):
+                # If parsing fails, return None to handle missing/invalid dates
+                return None
+        return v
 
 
 class PipelineStage(BaseModel):
@@ -76,7 +101,10 @@ class PipelineStage(BaseModel):
     id: str = Field(..., description="Stage ID")
     name: str = Field(..., description="Stage name")
     position: int = Field(..., description="Stage position in pipeline")
-    pipelineId: str = Field(..., description="Pipeline ID this stage belongs to")
+    # pipelineId not returned in nested stages
+    originId: Optional[str] = Field(None, description="Origin ID")
+    showInFunnel: Optional[bool] = Field(None, description="Show in funnel view")
+    showInPieChart: Optional[bool] = Field(None, description="Show in pie chart")
 
 
 class Attribution(BaseModel):
@@ -198,6 +226,11 @@ class Opportunity(BaseModel):
     attributions: List[Attribution] = Field(
         default_factory=list, description="Attribution data"
     )
+    
+    # Additional fields from single opportunity response
+    isAttribute: Optional[bool] = Field(None, description="Is attribute flag")
+    lastActionDate: Optional[Union[datetime, str]] = Field(None, description="Last action date")
+    internalSource: Optional[Dict[str, Any]] = Field(None, description="Internal source information")
 
     # Pipeline information (populated in responses)
     pipeline: Optional[Pipeline] = Field(None, description="Pipeline details")

@@ -85,11 +85,13 @@ class Message(BaseModel):
     status: Optional[Union[MessageStatus, str]] = (
         None  # Allow any string for flexibility
     )
-    dateAdded: Optional[datetime] = None
-    dateUpdated: Optional[datetime] = None
+    dateAdded: Optional[Union[datetime, str]] = None  # Can be datetime or ISO string
+    dateUpdated: Optional[Union[datetime, str]] = None
     attachments: Optional[List[Dict[str, Any]]] = None
     meta: Optional[Dict[str, Any]] = None
     source: Optional[str] = None
+    userId: Optional[str] = None
+    contentType: Optional[str] = None
 
 
 class MessageCreate(BaseModel):
@@ -122,16 +124,31 @@ class Conversation(BaseModel):
     locationId: str
     contactId: str
     lastMessageBody: Optional[str] = None
-    lastMessageType: Optional[MessageType] = None
-    lastMessageDate: Optional[datetime] = None
+    lastMessageType: Optional[str] = None  # API returns "TYPE_SMS", "TYPE_EMAIL", etc.
+    lastMessageDate: Optional[int] = None  # Unix timestamp in milliseconds
+    lastMessageDirection: Optional[str] = None
+    lastOutboundMessageAction: Optional[str] = None
+    lastManualMessageDate: Optional[int] = None
     unreadCount: int = 0
-    dateAdded: Optional[datetime] = None
-    dateUpdated: Optional[datetime] = None
-    starred: bool = False
+    dateAdded: Optional[int] = None  # Unix timestamp in milliseconds
+    dateUpdated: Optional[int] = None  # Unix timestamp in milliseconds
+    starred: Optional[bool] = False
+    deleted: Optional[bool] = False
+    inbox: Optional[bool] = True
+    assignedTo: Optional[str] = None
+    userId: Optional[str] = None
+    followers: Optional[List[str]] = Field(default_factory=list)
+    isLastMessageInternalComment: Optional[bool] = False
     fullName: Optional[str] = None
     contactName: Optional[str] = None
+    companyName: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    tags: Optional[List[str]] = Field(default_factory=list)
+    type: Optional[Union[str, int]] = None  # "TYPE_PHONE" or numeric (1, etc.)
+    scoring: Optional[List[Any]] = Field(default_factory=list)
+    attributed: Optional[Union[bool, None]] = None
+    sort: Optional[List[int]] = None
 
 
 class ConversationCreate(BaseModel):
@@ -148,6 +165,7 @@ class ConversationList(BaseModel):
     conversations: List[Conversation]
     total: Optional[int] = None
     count: int
+    traceId: Optional[str] = None
 
 
 class MessageList(BaseModel):
