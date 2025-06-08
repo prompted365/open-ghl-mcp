@@ -252,6 +252,12 @@ class OAuthService:
         "conversations/message.readonly",
         "conversations/message.write",
         "locations.readonly",
+        "opportunities.readonly",
+        "opportunities.write",
+        "calendars.readonly",
+        "calendars.write",
+        "calendars/events.readonly",
+        "calendars/events.write",
     ]
 
     def __init__(self) -> None:

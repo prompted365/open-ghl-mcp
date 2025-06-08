@@ -187,7 +187,6 @@ class StandardModeSetup:
         #     else:
         #         print("Please enter 1 or 2.")
 
-
     async def interactive_custom_setup(self) -> bool:
         """Interactive setup for custom mode"""
 
@@ -441,3 +440,51 @@ OAUTH_SERVER_PORT=8080
 
             traceback.print_exc(file=sys.stderr)
             return False
+
+    def show_claude_desktop_instructions(self) -> None:
+        """Show Claude Desktop configuration instructions"""
+        import os
+        
+        print("\n" + "=" * 60)
+        print("🎯 Next Step: Configure Claude Desktop")
+        print("=" * 60)
+
+        # Check for virtual environment
+        venv_path = Path(os.getcwd()) / ".venv"
+        if venv_path.exists():
+            python_path = str(venv_path / "bin" / "python")
+        else:
+            python_path = "python"
+            print("\n⚠️  Warning: No .venv directory found.")
+            print("   Make sure you have installed requirements:")
+            print("   python -m venv .venv")
+            print(
+                "   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate"
+            )
+            print("   pip install -r requirements.txt")
+
+        print("\n📋 Add this server to Claude Desktop:")
+        print("\n1. Open Claude Desktop settings")
+        print("2. Navigate to 'Developer' → 'Edit Config'")
+        print("3. Add the following to your mcpServers configuration:")
+        print(
+            f"""
+{{
+  "mcpServers": {{
+    "ghl-mcp-server": {{
+      "command": "{python_path}",
+      "args": [
+        "-m",
+        "src.main"
+      ],
+      "cwd": "{os.getcwd()}",
+      "env": {{
+        "PYTHONPATH": "{os.getcwd()}"
+      }}
+    }}
+  }}
+}}
+"""
+        )
+        print("4. Save the configuration and restart Claude Desktop")
+        print("\n✅ Your GoHighLevel MCP server is now configured!")

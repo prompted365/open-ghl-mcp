@@ -36,7 +36,18 @@ class Contact(BaseModel):
     firstName: Optional[str] = None
     lastName: Optional[str] = None
     name: Optional[str] = None
+    contactName: Optional[str] = None
+    firstNameRaw: Optional[str] = None
+    lastNameRaw: Optional[str] = None
+    firstNameLowerCase: Optional[str] = None
+    lastNameLowerCase: Optional[str] = None
+    fullNameLowerCase: Optional[str] = None
     email: Optional[str] = None
+    emailLowerCase: Optional[str] = None
+    bounceEmail: Optional[bool] = None
+    unsubscribeEmail: Optional[bool] = None
+    validEmail: Optional[bool] = None
+    validEmailDate: Optional[datetime] = None
     phone: Optional[str] = None
     address1: Optional[str] = None
     city: Optional[str] = None
@@ -48,17 +59,22 @@ class Contact(BaseModel):
     dnd: bool = False
     dndSettings: Optional[Dict[str, Any]] = None
     tags: List[str] = Field(default_factory=list)
+    type: Optional[str] = None
     source: Optional[str] = None
-    customFields: Optional[List[Dict[str, Any]]] = None
+    assignedTo: Optional[str] = None
     dateAdded: Optional[datetime] = None
     dateUpdated: Optional[datetime] = None
+    dateOfBirth: Optional[datetime] = None
+    businessId: Optional[str] = None
+    followers: List[str] = Field(default_factory=list)
+    additionalEmails: List[str] = Field(default_factory=list)
+    attributions: List[Dict[str, Any]] = Field(default_factory=list)
+    attributionSource: Optional[Dict[str, Any]] = None
+    createdBy: Optional[Dict[str, Any]] = None
+    lastUpdatedBy: Optional[Dict[str, Any]] = None
     lastActivity: Optional[datetime] = None
-
-    # Additional fields from API
-    companyName: Optional[str] = None
-    assignedTo: Optional[str] = None
-    followers: Optional[List[str]] = None
-    additionalEmails: Optional[List[ContactEmail]] = None
+    lastSessionActivityAt: Optional[datetime] = None
+    deleted: Optional[bool] = None
     additionalPhones: Optional[List[ContactPhone]] = None
 
     model_config = {"populate_by_name": True}
@@ -107,12 +123,26 @@ class ContactUpdate(BaseModel):
     companyName: Optional[str] = None
 
 
+class ContactListMeta(BaseModel):
+    """Pagination metadata for contact list"""
+    
+    total: int
+    nextPageUrl: Optional[str] = None
+    startAfterId: Optional[str] = None
+    startAfter: Optional[int] = None
+    currentPage: Optional[int] = None
+    nextPage: Optional[int] = None
+    prevPage: Optional[int] = None
+
+
 class ContactList(BaseModel):
     """Response model for contact list"""
 
     contacts: List[Contact]
     count: int
     total: Optional[int] = None
+    meta: Optional[ContactListMeta] = None
+    traceId: Optional[str] = None
 
 
 class ContactSearchParams(BaseModel):

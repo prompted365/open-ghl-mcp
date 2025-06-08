@@ -255,8 +255,9 @@ OAUTH_SERVER_PORT=8080
                     }
                     mock_post.return_value = mock_response
 
-                    # Should be able to get headers with location token
-                    headers = await ghl_client._get_headers(
+                    # Test that the client is properly initialized and can make requests
+                    # by accessing the base client through the contacts client
+                    headers = await ghl_client._contacts._get_headers(
                         location_id="test_location_123"
                     )
 

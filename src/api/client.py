@@ -1,5 +1,7 @@
+"""Main GoHighLevel API v2 client with composition pattern"""
+
 from typing import Any, Dict, Optional, List
-import httpx
+from datetime import date
 
 from ..services.oauth import OAuthService
 from ..models.contact import Contact, ContactCreate, ContactUpdate, ContactList
@@ -11,85 +13,78 @@ from ..models.conversation import (
     MessageCreate,
     MessageList,
 )
-from ..utils.exceptions import handle_api_error
+from ..models.opportunity import (
+    Opportunity,
+    OpportunityCreate,
+    OpportunityUpdate,
+    OpportunitySearchResult,
+    OpportunitySearchFilters,
+    Pipeline,
+    PipelineStage,
+)
+from ..models.calendar import (
+    Appointment,
+    AppointmentCreate,
+    AppointmentUpdate,
+    AppointmentList,
+    Calendar,
+    CalendarList,
+    FreeSlotsResult,
+)
+
+from .contacts import ContactsClient
+from .conversations import ConversationsClient
+from .opportunities import OpportunitiesClient
+from .calendars import CalendarsClient
 
 
 class GoHighLevelClient:
-    """Client for interacting with GoHighLevel API v2"""
+    """Main client for interacting with GoHighLevel API v2
 
-    API_BASE_URL = "https://services.leadconnectorhq.com"
+    Uses composition pattern to delegate to specialized endpoint clients
+    while maintaining the same public interface for backward compatibility.
+    """
 
     def __init__(self, oauth_service: OAuthService):
         self.oauth_service = oauth_service
-        self.client = httpx.AsyncClient(base_url=self.API_BASE_URL)
+
+        # Initialize specialized clients
+        self._contacts = ContactsClient(oauth_service)
+        self._conversations = ConversationsClient(oauth_service)
+        self._opportunities = OpportunitiesClient(oauth_service)
+        self._calendars = CalendarsClient(oauth_service)
 
     async def __aenter__(self):
+        # Enter all specialized clients
+        await self._contacts.__aenter__()
+        await self._conversations.__aenter__()
+        await self._opportunities.__aenter__()
+        await self._calendars.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.client.aclose()
+        # Exit all specialized clients
+        await self._contacts.__aexit__(exc_type, exc_val, exc_tb)
+        await self._conversations.__aexit__(exc_type, exc_val, exc_tb)
+        await self._opportunities.__aexit__(exc_type, exc_val, exc_tb)
+        await self._calendars.__aexit__(exc_type, exc_val, exc_tb)
 
-    async def _get_headers(self, location_id: Optional[str] = None) -> Dict[str, str]:
-        """Get request headers with valid token
-
-        Args:
-            location_id: If provided, will get location-specific token
-        """
-        if location_id:
-            # Get location-specific token for contact operations
-            token = await self.oauth_service.get_location_token(location_id)
-        else:
-            # Use agency token for general operations
-            token = await self.oauth_service.get_valid_token()
-
-        return {
-            "Authorization": f"Bearer {token}",
-            "Version": "2021-07-28",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-
-    async def _request(
-        self,
-        method: str,
-        endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        location_id: Optional[str] = None,
-        **kwargs,
-    ) -> httpx.Response:
-        """Make an authenticated request to the API"""
-        headers = await self._get_headers(location_id)
-
-        response = await self.client.request(
-            method=method,
-            url=endpoint,
-            headers=headers,
-            params=params,
-            json=json,
-            **kwargs,
-        )
-
-        if response.status_code >= 400:
-            handle_api_error(response)
-
-        return response
-
-    # API Methods will be added here as we implement them
+    # Location Methods (keeping these in main client for now)
 
     async def get_locations(self, limit: int = 100, skip: int = 0) -> Dict[str, Any]:
         """Get all locations"""
-        response = await self._request(
+        # Use the first available client for the request
+        response = await self._contacts._request(
             "GET", "/locations/search", params={"limit": limit, "skip": skip}
         )
         return response.json()
 
     async def get_location(self, location_id: str) -> Dict[str, Any]:
         """Get a specific location"""
-        response = await self._request("GET", f"/locations/{location_id}")
+        response = await self._contacts._request("GET", f"/locations/{location_id}")
         return response.json()
 
-    # Contact Methods
+    # Contact Methods - Delegate to ContactsClient
 
     async def get_contacts(
         self,
@@ -102,97 +97,47 @@ class GoHighLevelClient:
         tags: Optional[List[str]] = None,
     ) -> ContactList:
         """Get contacts for a location"""
-        params = {"locationId": location_id, "limit": limit}
-
-        # Only add skip if it's greater than 0
-        if skip > 0:
-            params["skip"] = skip
-
-        if query:
-            params["query"] = query
-        if email:
-            params["email"] = email
-        if phone:
-            params["phone"] = phone
-        if tags:
-            params["tags"] = ",".join(tags)
-
-        response = await self._request(
-            "GET", "/contacts", params=params, location_id=location_id
-        )
-        data = response.json()
-        return ContactList(
-            contacts=[Contact(**c) for c in data.get("contacts", [])],
-            count=len(data.get("contacts", [])),
-            total=data.get("total"),
+        return await self._contacts.get_contacts(
+            location_id=location_id,
+            limit=limit,
+            skip=skip,
+            query=query,
+            email=email,
+            phone=phone,
+            tags=tags,
         )
 
     async def get_contact(self, contact_id: str, location_id: str) -> Contact:
         """Get a specific contact"""
-        response = await self._request(
-            "GET", f"/contacts/{contact_id}", location_id=location_id
-        )
-        data = response.json()
-        return Contact(**data.get("contact", data))
+        return await self._contacts.get_contact(contact_id, location_id)
 
     async def create_contact(self, contact: ContactCreate) -> Contact:
         """Create a new contact"""
-        response = await self._request(
-            "POST",
-            "/contacts",
-            json=contact.model_dump(exclude_none=True),
-            location_id=contact.locationId,
-        )
-        data = response.json()
-        return Contact(**data.get("contact", data))
+        return await self._contacts.create_contact(contact)
 
     async def update_contact(
         self, contact_id: str, updates: ContactUpdate, location_id: str
     ) -> Contact:
         """Update an existing contact"""
-        response = await self._request(
-            "PUT",
-            f"/contacts/{contact_id}",
-            json=updates.model_dump(exclude_none=True),
-            location_id=location_id,
-        )
-        data = response.json()
-        return Contact(**data.get("contact", data))
+        return await self._contacts.update_contact(contact_id, updates, location_id)
 
     async def delete_contact(self, contact_id: str, location_id: str) -> bool:
         """Delete a contact"""
-        response = await self._request(
-            "DELETE", f"/contacts/{contact_id}", location_id=location_id
-        )
-        return response.status_code == 200
+        return await self._contacts.delete_contact(contact_id, location_id)
 
     async def add_contact_tags(
         self, contact_id: str, tags: List[str], location_id: str
     ) -> Contact:
         """Add tags to a contact"""
-        response = await self._request(
-            "POST",
-            f"/contacts/{contact_id}/tags",
-            json={"tags": tags},
-            location_id=location_id,
-        )
-        data = response.json()
-        return Contact(**data.get("contact", data))
+        return await self._contacts.add_contact_tags(contact_id, tags, location_id)
 
     async def remove_contact_tags(
         self, contact_id: str, tags: List[str], location_id: str
     ) -> Contact:
         """Remove tags from a contact"""
-        response = await self._request(
-            "DELETE",
-            f"/contacts/{contact_id}/tags",
-            json={"tags": tags},
-            location_id=location_id,
-        )
-        data = response.json()
-        return Contact(**data.get("contact", data))
+        return await self._contacts.remove_contact_tags(contact_id, tags, location_id)
 
-    # Conversation Methods
+    # Conversation Methods - Delegate to ConversationsClient
 
     async def get_conversations(
         self,
@@ -204,123 +149,171 @@ class GoHighLevelClient:
         unread_only: Optional[bool] = None,
     ) -> ConversationList:
         """Get conversations for a location"""
-        params = {"locationId": location_id, "limit": limit}
-
-        if skip > 0:
-            params["skip"] = skip
-        if contact_id:
-            params["contactId"] = contact_id
-        if starred is not None:
-            params["starred"] = starred
-        if unread_only is not None:
-            params["unreadOnly"] = unread_only
-
-        response = await self._request(
-            "GET", "/conversations/search", params=params, location_id=location_id
-        )
-        data = response.json()
-        return ConversationList(
-            conversations=[Conversation(**c) for c in data.get("conversations", [])],
-            count=len(data.get("conversations", [])),
-            total=data.get("total"),
+        return await self._conversations.get_conversations(
+            location_id=location_id,
+            limit=limit,
+            skip=skip,
+            contact_id=contact_id,
+            starred=starred,
+            unread_only=unread_only,
         )
 
     async def get_conversation(
         self, conversation_id: str, location_id: str
     ) -> Conversation:
         """Get a specific conversation"""
-        response = await self._request(
-            "GET", f"/conversations/{conversation_id}", location_id=location_id
-        )
-        data = response.json()
-        return Conversation(**data.get("conversation", data))
+        return await self._conversations.get_conversation(conversation_id, location_id)
 
     async def create_conversation(
         self, conversation: ConversationCreate
     ) -> Conversation:
         """Create a new conversation"""
-        response = await self._request(
-            "POST",
-            "/conversations",
-            json=conversation.model_dump(exclude_none=True),
-            location_id=conversation.locationId,
-        )
-        data = response.json()
-        return Conversation(**data.get("conversation", data))
+        return await self._conversations.create_conversation(conversation)
 
     async def get_messages(
         self, conversation_id: str, location_id: str, limit: int = 100, skip: int = 0
     ) -> MessageList:
         """Get messages for a conversation"""
-        params = {"limit": limit}
-
-        if skip > 0:
-            params["skip"] = skip
-
-        response = await self._request(
-            "GET",
-            f"/conversations/{conversation_id}/messages",
-            params=params,
-            location_id=location_id,
-        )
-        data = response.json()
-        # Handle nested response structure
-        if isinstance(data.get("messages"), dict):
-            # Messages are nested under messages.messages
-            messages_data = data["messages"].get("messages", [])
-            total = len(messages_data)  # or data["messages"].get("total")
-        else:
-            # Direct array of messages
-            messages_data = data.get("messages", [])
-            total = data.get("total")
-
-        return MessageList(
-            messages=[Message(**m) for m in messages_data if isinstance(m, dict)],
-            count=len(messages_data),
-            total=total,
+        return await self._conversations.get_messages(
+            conversation_id, location_id, limit, skip
         )
 
     async def send_message(
         self, conversation_id: str, message: MessageCreate, location_id: str
     ) -> Message:
         """Send a message in a conversation"""
-        # Extract phone from message if present
-        message_data = message.model_dump(exclude_none=True)
-        phone = message_data.pop("phone", None)
-
-        # Build payload with phone at top level if needed
-        payload = {"conversationId": conversation_id, **message_data}
-        if phone:
-            # Try different field names the API might expect
-            payload["phoneNumber"] = phone  # Try phoneNumber instead of phone
-
-        response = await self._request(
-            "POST", "/conversations/messages", json=payload, location_id=location_id
-        )
-        data = response.json()
-        # API returns {conversationId, messageId} for sent messages
-        # Convert message type to int for the response
-        message_type_int = (
-            1 if message.type == "SMS" else 2 if message.type == "Email" else 0
-        )
-        return Message(
-            id=data.get("messageId", data.get("id", "unknown")),
-            conversationId=data.get("conversationId", conversation_id),
-            body=message.message,
-            type=message_type_int,
-            contactId=message.contactId,
-            status="sent",
+        return await self._conversations.send_message(
+            conversation_id, message, location_id
         )
 
     async def update_message_status(
         self, message_id: str, status: str, location_id: str
     ) -> Message:
         """Update the status of a message"""
-        response = await self._request(
-            "PUT",
-            f"/conversations/messages/{message_id}/status",
-            json={"status": status},
-            location_id=location_id,
+        return await self._conversations.update_message_status(
+            message_id, status, location_id
         )
-        data = response.json()
-        return Message(**data.get("message", data))
+
+    # Opportunity Methods - Delegate to OpportunitiesClient
+
+    async def get_opportunities(
+        self,
+        location_id: str,
+        limit: int = 100,
+        skip: int = 0,
+        filters: Optional[OpportunitySearchFilters] = None,
+    ) -> OpportunitySearchResult:
+        """Get opportunities for a location"""
+        return await self._opportunities.get_opportunities(
+            location_id=location_id, limit=limit, skip=skip, filters=filters
+        )
+
+    async def get_opportunity(
+        self, opportunity_id: str, location_id: str
+    ) -> Opportunity:
+        """Get a specific opportunity"""
+        return await self._opportunities.get_opportunity(opportunity_id, location_id)
+
+    async def create_opportunity(self, opportunity: OpportunityCreate) -> Opportunity:
+        """Create a new opportunity"""
+        return await self._opportunities.create_opportunity(opportunity)
+
+    async def update_opportunity(
+        self, opportunity_id: str, updates: OpportunityUpdate, location_id: str
+    ) -> Opportunity:
+        """Update an existing opportunity"""
+        return await self._opportunities.update_opportunity(
+            opportunity_id, updates, location_id
+        )
+
+    async def delete_opportunity(self, opportunity_id: str, location_id: str) -> bool:
+        """Delete an opportunity"""
+        return await self._opportunities.delete_opportunity(opportunity_id, location_id)
+
+    async def update_opportunity_status(
+        self, opportunity_id: str, status: str, location_id: str
+    ) -> Opportunity:
+        """Update opportunity status"""
+        return await self._opportunities.update_opportunity_status(
+            opportunity_id, status, location_id
+        )
+
+    async def get_pipelines(self, location_id: str) -> List[Pipeline]:
+        """Get all pipelines for a location"""
+        return await self._opportunities.get_pipelines(location_id)
+
+    async def get_pipeline(self, pipeline_id: str, location_id: str) -> Pipeline:
+        """Get a specific pipeline"""
+        return await self._opportunities.get_pipeline(pipeline_id, location_id)
+
+    async def get_pipeline_stages(
+        self, pipeline_id: str, location_id: str
+    ) -> List[PipelineStage]:
+        """Get stages for a specific pipeline"""
+        return await self._opportunities.get_pipeline_stages(pipeline_id, location_id)
+
+    # Calendar Methods - Delegate to CalendarsClient
+
+    async def get_appointments(
+        self,
+        calendar_id: str,
+        location_id: str,
+        limit: int = 100,
+        skip: int = 0,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        user_id: Optional[str] = None,
+    ) -> AppointmentList:
+        """Get appointments for a calendar"""
+        return await self._calendars.get_appointments(
+            calendar_id=calendar_id,
+            location_id=location_id,
+            limit=limit,
+            skip=skip,
+            start_date=start_date,
+            end_date=end_date,
+            user_id=user_id,
+        )
+
+    async def get_appointment(
+        self, appointment_id: str, location_id: str
+    ) -> Appointment:
+        """Get a specific appointment"""
+        return await self._calendars.get_appointment(appointment_id, location_id)
+
+    async def create_appointment(self, appointment: AppointmentCreate) -> Appointment:
+        """Create a new appointment"""
+        return await self._calendars.create_appointment(appointment)
+
+    async def update_appointment(
+        self, appointment_id: str, updates: AppointmentUpdate, location_id: str
+    ) -> Appointment:
+        """Update an existing appointment"""
+        return await self._calendars.update_appointment(
+            appointment_id, updates, location_id
+        )
+
+    async def delete_appointment(self, appointment_id: str, location_id: str) -> bool:
+        """Delete an appointment"""
+        return await self._calendars.delete_appointment(appointment_id, location_id)
+
+    async def get_calendars(self, location_id: str) -> CalendarList:
+        """Get all calendars for a location"""
+        return await self._calendars.get_calendars(location_id)
+
+    async def get_calendar(self, calendar_id: str, location_id: str) -> Calendar:
+        """Get a specific calendar"""
+        return await self._calendars.get_calendar(calendar_id, location_id)
+
+    async def get_free_slots(
+        self,
+        calendar_id: str,
+        location_id: str,
+        start_date: date,
+        end_date: Optional[date] = None,
+        timezone: Optional[str] = None,
+    ) -> FreeSlotsResult:
+        """Get available time slots for a calendar"""
+        return await self._calendars.get_free_slots(
+            calendar_id, location_id, start_date, end_date, timezone
+        )

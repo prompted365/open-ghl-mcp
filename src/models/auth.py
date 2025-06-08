@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 
 
@@ -38,6 +38,8 @@ class StoredToken(BaseModel):
     scope: str
     user_type: str
 
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
     @classmethod
     def from_token_response(cls, response: TokenResponse) -> "StoredToken":
         """Create StoredToken from OAuth response"""
@@ -53,9 +55,21 @@ class StoredToken(BaseModel):
 
     def is_expired(self) -> bool:
         """Check if the token is expired"""
-        return datetime.now(timezone.utc) >= self.expires_at
+        now = datetime.now(timezone.utc)
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return now >= expires_at
 
     def needs_refresh(self, buffer_seconds: int = 300) -> bool:
         """Check if token needs refresh (with 5-minute buffer by default)"""
-        buffer_time = datetime.now(timezone.utc).timestamp() + buffer_seconds
-        return datetime.fromtimestamp(buffer_time, timezone.utc) >= self.expires_at
+        # Ensure we're always comparing timezone-aware datetimes
+        now = datetime.now(timezone.utc)
+        buffer_time = now + timedelta(seconds=buffer_seconds)
+        
+        # Make sure expires_at is timezone-aware
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
+        return buffer_time >= expires_at

@@ -2,28 +2,28 @@
 """GoHighLevel MCP Server using FastMCP"""
 
 import asyncio
-import os
 import sys
-from typing import Optional, Dict, Any, List
+from typing import Optional
 
 from fastmcp import FastMCP
-from pydantic import BaseModel, Field
 
 from .api.client import GoHighLevelClient
 from .services.oauth import OAuthService
 from .services.setup import StandardModeSetup
-from .models.contact import ContactCreate, ContactUpdate
-from .models.conversation import (
-    ConversationCreate,
-    MessageCreate,
-    MessageStatus,
-    MessageType,
-)
+from .utils.client_helpers import get_client_with_token_override
+
+# Import parameter classes
+from .mcp.params import *
+
+# Import tools and resources registration functions
+from .mcp.tools.contacts import _register_contact_tools
+from .mcp.tools.conversations import _register_conversation_tools
+from .mcp.tools.opportunities import _register_opportunity_tools
+from .mcp.tools.calendars import _register_calendar_tools
 
 
 async def startup_check_and_setup():
     """Check authentication status and run setup if needed"""
-    from pathlib import Path
 
     print("🔧 Basic Machines -> GoHighLevel MCP Server")
     print("   Version 0.1.0")
@@ -93,80 +93,34 @@ async def startup_check_and_setup():
                 custom_setup_success = await setup.interactive_custom_setup()
 
                 if custom_setup_success:
-                    # Clear the choice marker since setup is now complete
+                    # Custom setup completed successfully
                     setup.clear_custom_mode_choice()
-                    # Continue to show Claude Desktop instructions
+                    print("✅ Custom mode setup completed successfully!")
+                    return True
                 else:
-                    return "exit_after_custom_instructions"
+                    print("❌ Custom setup was not completed successfully.")
+                    print("   Please run the server again to retry setup.\n")
+                    return False
             else:
-                # Standard mode - run standard setup
-                print("📋 Running Standard Mode setup...\n")
+                # Standard mode - re-run standard setup
+                print("🔧 Re-running Standard Mode setup...\n")
                 setup_success = await setup.interactive_setup()
 
                 if not setup_success:
                     print("❌ Setup was not completed successfully.")
-                    print(
-                        "   The MCP server cannot start without valid authentication."
-                    )
                     print("   Please run the server again to retry setup.\n")
                     return False
 
-        # Setup completed successfully - show Claude Desktop instructions
-        print("\n" + "=" * 60)
-        print("🎯 Next Step: Configure Claude Desktop")
-        print("=" * 60)
+                print("✅ Standard mode setup completed successfully!")
+                return True
 
-        # Check for virtual environment
-        venv_path = Path(os.getcwd()) / ".venv"
-        if venv_path.exists():
-            python_path = str(venv_path / "bin" / "python")
-        else:
-            python_path = "python"
-            print("\n⚠️  Warning: No .venv directory found.")
-            print("   Make sure you have installed requirements:")
-            print("   python -m venv .venv")
-            print(
-                "   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate"
-            )
-            print("   pip install -r requirements.txt")
-
-        print("\n📋 Add this server to Claude Desktop:")
-        print("\n1. Open Claude Desktop settings")
-        print("2. Navigate to 'Developer' → 'Edit Config'")
-        print("3. Add the following to your mcpServers configuration:")
-        print(
-            f"""
-{{
-  "mcpServers": {{
-    "ghl-mcp-server": {{
-      "command": "{python_path}",
-      "args": [
-        "-m",
-        "src.main"
-      ],
-      "cwd": "{os.getcwd()}",
-      "env": {{
-        "PYTHONPATH": "{os.getcwd()}"
-      }}
-    }}
-  }}
-}}
-"""
-        )
-        print("4. Save the configuration and restart Claude Desktop")
-        print("\n✅ Your GoHighLevel MCP server is now configured!")
-
-        # Exit after successful setup
-        return "exit_after_setup"
+        # Show Claude Desktop configuration instructions
+        setup.show_claude_desktop_instructions()
+        return True
 
 
 # Initialize FastMCP server
-mcp: FastMCP = FastMCP(
-    name="ghl-mcp-server",
-    version="0.1.0",
-    description="MCP server for GoHighLevel API v2 integration",
-    dependencies=["httpx", "pydantic", "python-dotenv"],
-)
+mcp: FastMCP = FastMCP("ghl-mcp-server")
 
 # Global clients - will be initialized after startup check
 oauth_service: Optional[OAuthService] = None
@@ -180,542 +134,23 @@ def initialize_clients():
     ghl_client = GoHighLevelClient(oauth_service)
 
 
-# Tool Models
-
-
-class CreateContactParams(BaseModel):
-    """Parameters for creating a contact"""
-
-    location_id: str = Field(
-        ..., description="The location ID where the contact will be created"
-    )
-    first_name: Optional[str] = Field(None, description="Contact's first name")
-    last_name: Optional[str] = Field(None, description="Contact's last name")
-    email: Optional[str] = Field(None, description="Contact's email address")
-    phone: Optional[str] = Field(None, description="Contact's phone number")
-    tags: Optional[List[str]] = Field(None, description="Tags to assign to the contact")
-    source: Optional[str] = Field(None, description="Source of the contact")
-    company_name: Optional[str] = Field(None, description="Contact's company name")
-    address: Optional[str] = Field(None, description="Contact's street address")
-    city: Optional[str] = Field(None, description="Contact's city")
-    state: Optional[str] = Field(None, description="Contact's state")
-    postal_code: Optional[str] = Field(None, description="Contact's postal code")
-    custom_fields: Optional[Dict[str, Any]] = Field(
-        None, description="Custom field values"
-    )
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class UpdateContactParams(BaseModel):
-    """Parameters for updating a contact"""
-
-    contact_id: str = Field(..., description="The contact ID to update")
-    location_id: str = Field(
-        ..., description="The location ID where the contact exists"
-    )
-    first_name: Optional[str] = Field(None, description="Contact's first name")
-    last_name: Optional[str] = Field(None, description="Contact's last name")
-    email: Optional[str] = Field(None, description="Contact's email address")
-    phone: Optional[str] = Field(None, description="Contact's phone number")
-    tags: Optional[List[str]] = Field(None, description="Tags to assign to the contact")
-    company_name: Optional[str] = Field(None, description="Contact's company name")
-    address: Optional[str] = Field(None, description="Contact's street address")
-    city: Optional[str] = Field(None, description="Contact's city")
-    state: Optional[str] = Field(None, description="Contact's state")
-    postal_code: Optional[str] = Field(None, description="Contact's postal code")
-    custom_fields: Optional[Dict[str, Any]] = Field(
-        None, description="Custom field values"
-    )
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class DeleteContactParams(BaseModel):
-    """Parameters for deleting a contact"""
-
-    contact_id: str = Field(..., description="The contact ID to delete")
-    location_id: str = Field(
-        ..., description="The location ID where the contact exists"
-    )
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class SearchContactsParams(BaseModel):
-    """Parameters for searching contacts"""
-
-    location_id: str = Field(..., description="The location ID to search contacts in")
-    query: Optional[str] = Field(None, description="Search query string")
-    email: Optional[str] = Field(None, description="Filter by email address")
-    phone: Optional[str] = Field(None, description="Filter by phone number")
-    tags: Optional[List[str]] = Field(None, description="Filter by tags")
-    limit: int = Field(100, description="Number of results to return", ge=1, le=100)
-    skip: int = Field(0, description="Number of results to skip", ge=0)
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class GetContactParams(BaseModel):
-    """Parameters for getting a single contact"""
-
-    contact_id: str = Field(..., description="The contact ID to retrieve")
-    location_id: str = Field(
-        ..., description="The location ID where the contact exists"
-    )
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class ManageTagsParams(BaseModel):
-    """Parameters for managing contact tags"""
-
-    contact_id: str = Field(..., description="The contact ID")
-    location_id: str = Field(
-        ..., description="The location ID where the contact exists"
-    )
-    tags: List[str] = Field(..., description="Tags to add or remove")
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-# Conversation Tool Models
-
-
-class GetConversationsParams(BaseModel):
-    """Parameters for getting conversations"""
-
-    location_id: str = Field(..., description="The location ID")
-    contact_id: Optional[str] = Field(None, description="Filter by contact ID")
-    starred: Optional[bool] = Field(None, description="Filter by starred status")
-    unread_only: Optional[bool] = Field(
-        None, description="Only show unread conversations"
-    )
-    limit: int = Field(100, description="Number of results to return", ge=1, le=100)
-    skip: int = Field(0, description="Number of results to skip", ge=0)
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class GetConversationParams(BaseModel):
-    """Parameters for getting a single conversation"""
-
-    conversation_id: str = Field(..., description="The conversation ID")
-    location_id: str = Field(..., description="The location ID")
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class CreateConversationParams(BaseModel):
-    """Parameters for creating a conversation"""
-
-    location_id: str = Field(..., description="The location ID")
-    contact_id: str = Field(..., description="The contact ID")
-    message_type: Optional[str] = Field(
-        None,
-        description="Initial message type: SMS, Email, WhatsApp, IG, FB, Custom, Live_Chat",
-    )
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class GetMessagesParams(BaseModel):
-    """Parameters for getting messages in a conversation"""
-
-    conversation_id: str = Field(..., description="The conversation ID")
-    location_id: str = Field(..., description="The location ID")
-    limit: int = Field(100, description="Number of results to return", ge=1, le=100)
-    skip: int = Field(0, description="Number of results to skip", ge=0)
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class SendMessageParams(BaseModel):
-    """Parameters for sending a message"""
-
-    conversation_id: str = Field(..., description="The conversation ID")
-    location_id: str = Field(..., description="The location ID")
-    message_type: str = Field(
-        ...,
-        description="Type of message to send: SMS, Email, WhatsApp, IG, FB, Custom, Live_Chat",
-    )
-    contact_id: str = Field(..., description="Contact ID to send message to")
-
-    # SMS fields
-    message: Optional[str] = Field(None, description="Message content for SMS")
-    phone: Optional[str] = Field(None, description="Phone number for SMS messages")
-
-    # Email fields
-    html: Optional[str] = Field(None, description="HTML content for email messages")
-    text: Optional[str] = Field(
-        None, description="Plain text content for email messages"
-    )
-    subject: Optional[str] = Field(None, description="Subject line for email messages")
-
-    # General
-    attachments: Optional[List[Dict[str, Any]]] = Field(
-        None, description="Optional attachments"
-    )
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
-class UpdateMessageStatusParams(BaseModel):
-    """Parameters for updating message status"""
-
-    message_id: str = Field(..., description="The message ID")
-    location_id: str = Field(..., description="The location ID")
-    status: MessageStatus = Field(..., description="New status for the message")
-    access_token: Optional[str] = Field(
-        None, description="Optional access token to use instead of stored token"
-    )
-
-
 # Helper function to get client with optional token override
 async def get_client(access_token: Optional[str] = None) -> GoHighLevelClient:
     """Get GHL client with optional token override"""
-    # Ensure clients are initialized
-    if oauth_service is None or ghl_client is None:
-        raise RuntimeError(
-            "MCP server not properly initialized. Please restart the server."
-        )
+    return await get_client_with_token_override(oauth_service, ghl_client, access_token)
 
-    if access_token:
-        # Create a temporary client with the provided token
-        temp_oauth = OAuthService()
 
-        # Create an async function that returns the token
-        async def return_token() -> str:
-            return access_token
+# Register all tools with the MCP server
+def register_all_tools():
+    """Register all MCP tools and resources"""
+    _register_contact_tools(mcp, get_client)
+    _register_conversation_tools(mcp, get_client)
+    _register_opportunity_tools(mcp, get_client, lambda: oauth_service)
+    _register_calendar_tools(mcp, get_client)
 
-        temp_oauth.get_valid_token = return_token  # type: ignore
-        return GoHighLevelClient(temp_oauth)
-    return ghl_client
 
-
-# Tools
-
-
-@mcp.tool()
-async def create_contact(params: CreateContactParams) -> Dict[str, Any]:
-    """Create a new contact in GoHighLevel"""
-    client = await get_client(params.access_token)
-
-    contact_data = ContactCreate(
-        locationId=params.location_id,
-        firstName=params.first_name,
-        lastName=params.last_name,
-        email=params.email,
-        phone=params.phone,
-        tags=params.tags,
-        source=params.source,
-        companyName=params.company_name,
-        address1=params.address,
-        city=params.city,
-        state=params.state,
-        postalCode=params.postal_code,
-        customFields=[
-            {"key": k, "value": v} for k, v in (params.custom_fields or {}).items()
-        ],
-    )
-
-    contact = await client.create_contact(contact_data)
-    return {"success": True, "contact": contact.model_dump()}
-
-
-@mcp.tool()
-async def update_contact(params: UpdateContactParams) -> Dict[str, Any]:
-    """Update an existing contact in GoHighLevel"""
-    client = await get_client(params.access_token)
-
-    update_data = ContactUpdate(
-        firstName=params.first_name,
-        lastName=params.last_name,
-        email=params.email,
-        phone=params.phone,
-        tags=params.tags,
-        companyName=params.company_name,
-        address1=params.address,
-        city=params.city,
-        state=params.state,
-        postalCode=params.postal_code,
-        customFields=(
-            [{"key": k, "value": v} for k, v in (params.custom_fields or {}).items()]
-            if params.custom_fields
-            else None
-        ),
-    )
-
-    contact = await client.update_contact(
-        params.contact_id, update_data, params.location_id
-    )
-    return {"success": True, "contact": contact.model_dump()}
-
-
-@mcp.tool()
-async def delete_contact(params: DeleteContactParams) -> Dict[str, Any]:
-    """Delete a contact from GoHighLevel"""
-    client = await get_client(params.access_token)
-
-    success = await client.delete_contact(params.contact_id, params.location_id)
-    return {
-        "success": success,
-        "message": (
-            "Contact deleted successfully" if success else "Failed to delete contact"
-        ),
-    }
-
-
-@mcp.tool()
-async def get_contact(params: GetContactParams) -> Dict[str, Any]:
-    """Get a single contact by ID"""
-    client = await get_client(params.access_token)
-
-    contact = await client.get_contact(params.contact_id, params.location_id)
-    return {"success": True, "contact": contact.model_dump()}
-
-
-@mcp.tool()
-async def search_contacts(params: SearchContactsParams) -> Dict[str, Any]:
-    """Search contacts in a location"""
-    client = await get_client(params.access_token)
-
-    result = await client.get_contacts(
-        location_id=params.location_id,
-        limit=params.limit,
-        skip=params.skip,
-        query=params.query,
-        email=params.email,
-        phone=params.phone,
-        tags=params.tags,
-    )
-
-    return {
-        "success": True,
-        "contacts": [c.model_dump() for c in result.contacts],
-        "count": result.count,
-        "total": result.total,
-    }
-
-
-@mcp.tool()
-async def add_contact_tags(params: ManageTagsParams) -> Dict[str, Any]:
-    """Add tags to a contact"""
-    client = await get_client(params.access_token)
-
-    contact = await client.add_contact_tags(
-        params.contact_id, params.tags, params.location_id
-    )
-    return {"success": True, "contact": contact.model_dump()}
-
-
-@mcp.tool()
-async def remove_contact_tags(params: ManageTagsParams) -> Dict[str, Any]:
-    """Remove tags from a contact"""
-    client = await get_client(params.access_token)
-
-    contact = await client.remove_contact_tags(
-        params.contact_id, params.tags, params.location_id
-    )
-    return {"success": True, "contact": contact.model_dump()}
-
-
-# Conversation Tools
-
-
-@mcp.tool()
-async def get_conversations(params: GetConversationsParams) -> Dict[str, Any]:
-    """Get conversations for a location"""
-    client = await get_client(params.access_token)
-
-    result = await client.get_conversations(
-        location_id=params.location_id,
-        limit=params.limit,
-        skip=params.skip,
-        contact_id=params.contact_id,
-        starred=params.starred,
-        unread_only=params.unread_only,
-    )
-
-    return {
-        "success": True,
-        "conversations": [c.model_dump() for c in result.conversations],
-        "count": result.count,
-        "total": result.total,
-    }
-
-
-@mcp.tool()
-async def get_conversation(params: GetConversationParams) -> Dict[str, Any]:
-    """Get a single conversation"""
-    client = await get_client(params.access_token)
-
-    conversation = await client.get_conversation(
-        params.conversation_id, params.location_id
-    )
-    return {"success": True, "conversation": conversation.model_dump()}
-
-
-@mcp.tool()
-async def create_conversation(params: CreateConversationParams) -> Dict[str, Any]:
-    """Create a new conversation"""
-    client = await get_client(params.access_token)
-
-    conversation_data = ConversationCreate(
-        locationId=params.location_id,
-        contactId=params.contact_id,
-        lastMessageType=(
-            MessageType(params.message_type) if params.message_type else None
-        ),
-    )
-
-    conversation = await client.create_conversation(conversation_data)
-    return {"success": True, "conversation": conversation.model_dump()}
-
-
-@mcp.tool()
-async def get_messages(params: GetMessagesParams) -> Dict[str, Any]:
-    """Get messages from a conversation"""
-    client = await get_client(params.access_token)
-
-    result = await client.get_messages(
-        conversation_id=params.conversation_id,
-        location_id=params.location_id,
-        limit=params.limit,
-        skip=params.skip,
-    )
-
-    return {
-        "success": True,
-        "messages": [m.model_dump() for m in result.messages],
-        "count": result.count,
-        "total": result.total,
-    }
-
-
-@mcp.tool()
-async def send_message(params: SendMessageParams) -> Dict[str, Any]:
-    """Send a message in a conversation"""
-    client = await get_client(params.access_token)
-
-    message_data = MessageCreate(
-        type=params.message_type,
-        contactId=params.contact_id,
-        message=params.message,
-        phone=params.phone,
-        html=params.html,
-        text=params.text,
-        subject=params.subject,
-        attachments=params.attachments,
-    )
-
-    message = await client.send_message(
-        conversation_id=params.conversation_id,
-        message=message_data,
-        location_id=params.location_id,
-    )
-
-    return {"success": True, "message": message.model_dump()}
-
-
-@mcp.tool()
-async def update_message_status(params: UpdateMessageStatusParams) -> Dict[str, Any]:
-    """Update the status of a message"""
-    client = await get_client(params.access_token)
-
-    message = await client.update_message_status(
-        message_id=params.message_id,
-        status=params.status,
-        location_id=params.location_id,
-    )
-
-    return {"success": True, "message": message.model_dump()}
-
-
-@mcp.tool()
-async def debug_config() -> Dict[str, Any]:
-    """Debug tool to show current MCP server configuration and auth status"""
-    import os
-    from pathlib import Path
-
-    if oauth_service is None:
-        return {"error": "OAuth service not initialized"}
-
-    # Use absolute paths based on module location
-    project_root = Path(__file__).parent.parent
-    cwd = Path.cwd()
-    env_file = project_root / ".env"
-    tokens_file = project_root / "config" / "tokens.json"
-    standard_config_file = project_root / "config" / "standard_config.json"
-
-    # Check token validity
-    token_status = "unknown"
-    token_expires_at = None
-    if tokens_file.exists():
-        try:
-            import json
-            from datetime import datetime
-
-            with open(tokens_file) as f:
-                token_data = json.load(f)
-            expires_at = datetime.fromisoformat(
-                token_data["expires_at"].replace("Z", "+00:00")
-            )
-            now = datetime.now(expires_at.tzinfo)
-            token_status = "valid" if expires_at > now else "expired"
-            token_expires_at = token_data["expires_at"]
-        except Exception as e:
-            token_status = f"error: {e}"
-
-    return {
-        "environment": {
-            "working_directory": str(cwd),
-            "project_root": str(project_root),
-            "python_executable": sys.executable,
-            "auth_mode_env_var": os.environ.get("AUTH_MODE", "NOT_SET"),
-            "ghl_client_id_env_var": (
-                os.environ.get("GHL_CLIENT_ID", "NOT_SET")[:10] + "..."
-                if os.environ.get("GHL_CLIENT_ID")
-                else "NOT_SET"
-            ),
-        },
-        "files": {
-            "env_file_exists": env_file.exists(),
-            "tokens_json_exists": tokens_file.exists(),
-            "standard_config_json_exists": standard_config_file.exists(),
-        },
-        "oauth_service": {
-            "auth_mode": str(oauth_service.settings.auth_mode),
-            "ghl_client_id": (
-                oauth_service.settings.ghl_client_id[:10] + "..."
-                if oauth_service.settings.ghl_client_id
-                else None
-            ),
-            "has_ghl_client_secret": bool(oauth_service.settings.ghl_client_secret),
-            "supabase_url": oauth_service.settings.supabase_url,
-            "has_supabase_access_key": bool(oauth_service.settings.supabase_access_key),
-            "standard_auth_service_initialized": oauth_service._standard_auth
-            is not None,
-        },
-        "token_status": {
-            "custom_token_status": token_status,
-            "custom_token_expires_at": token_expires_at,
-        },
-    }
-
-
-# Resources
+# Resources will be imported separately in Phase 3
+# For now, they remain in this file to avoid breaking the server
 
 
 @mcp.resource("contacts://{location_id}")
@@ -739,14 +174,11 @@ async def list_contacts_resource(location_id: str) -> str:
         )
         lines.append(f"\n## {name}")
         lines.append(f"- ID: {contact.id}")
-        if contact.email:
-            lines.append(f"- Email: {contact.email}")
-        if contact.phone:
-            lines.append(f"- Phone: {contact.phone}")
+        lines.append(f"- Email: {contact.email or 'N/A'}")
+        lines.append(f"- Phone: {contact.phone or 'N/A'}")
         if contact.tags:
             lines.append(f"- Tags: {', '.join(contact.tags)}")
-        if contact.companyName:
-            lines.append(f"- Company: {contact.companyName}")
+        lines.append(f"- Date Added: {contact.dateAdded}")
 
     return "\n".join(lines)
 
@@ -767,34 +199,26 @@ async def get_contact_resource(location_id: str, contact_id: str) -> str:
         or "Unknown"
     )
     lines = [f"# Contact: {name}\n"]
-    lines.append(f"**ID:** {contact.id}")
-    lines.append(f"**Location:** {contact.locationId}")
-
-    if contact.email:
-        lines.append(f"**Email:** {contact.email}")
-    if contact.phone:
-        lines.append(f"**Phone:** {contact.phone}")
-    if contact.companyName:
-        lines.append(f"**Company:** {contact.companyName}")
+    lines.append(f"- ID: {contact.id}")
+    lines.append(f"- Location: {contact.locationId}")
+    lines.append(f"- Email: {contact.email or 'N/A'}")
+    lines.append(f"- Phone: {contact.phone or 'N/A'}")
     if contact.tags:
-        lines.append(f"**Tags:** {', '.join(contact.tags)}")
+        lines.append(f"- Tags: {', '.join(contact.tags)}")
     if contact.source:
-        lines.append(f"**Source:** {contact.source}")
-
+        lines.append(f"- Source: {contact.source}")
+    if contact.companyName:
+        lines.append(f"- Company: {contact.companyName}")
     if contact.address1:
-        address_parts = [contact.address1]
+        lines.append(f"- Address: {contact.address1}")
         if contact.city:
-            address_parts.append(contact.city)
+            lines.append(f"- City: {contact.city}")
         if contact.state:
-            address_parts.append(contact.state)
+            lines.append(f"- State: {contact.state}")
         if contact.postalCode:
-            address_parts.append(contact.postalCode)
-        lines.append(f"**Address:** {', '.join(address_parts)}")
-
-    if contact.dateAdded:
-        lines.append(f"**Added:** {contact.dateAdded}")
-    if contact.lastActivity:
-        lines.append(f"**Last Activity:** {contact.lastActivity}")
+            lines.append(f"- Postal Code: {contact.postalCode}")
+    lines.append(f"- Date Added: {contact.dateAdded}")
+    lines.append(f"- Last Updated: {contact.dateUpdated}")
 
     return "\n".join(lines)
 
@@ -812,19 +236,15 @@ async def list_conversations_resource(location_id: str) -> str:
     lines = [f"# Conversations for Location {location_id}\n"]
     lines.append(f"Total conversations: {result.total or result.count}\n")
 
-    for conv in result.conversations:
-        contact_name = conv.contactName or conv.fullName or "Unknown"
-        lines.append(f"\n## {contact_name}")
-        lines.append(f"- ID: {conv.id}")
-        lines.append(f"- Contact ID: {conv.contactId}")
-        if conv.lastMessageBody:
-            lines.append(f"- Last Message: {conv.lastMessageBody[:100]}...")
-        if conv.lastMessageType:
-            lines.append(f"- Last Message Type: {conv.lastMessageType}")
-        if conv.unreadCount > 0:
-            lines.append(f"- Unread: {conv.unreadCount}")
-        if conv.starred:
-            lines.append("- ⭐ Starred")
+    for conversation in result.conversations:
+        lines.append(f"\n## Conversation {conversation.id}")
+        lines.append(f"- Contact ID: {conversation.contactId}")
+        lines.append(f"- Type: {conversation.type}")
+        if conversation.lastMessageType:
+            lines.append(f"- Last Message Type: {conversation.lastMessageType.value}")
+        if conversation.lastMessageAt:
+            lines.append(f"- Last Message: {conversation.lastMessageAt}")
+        lines.append(f"- Unread: {'Yes' if conversation.unread else 'No'}")
 
     return "\n".join(lines)
 
@@ -837,37 +257,257 @@ async def get_conversation_resource(location_id: str, conversation_id: str) -> s
             "MCP server not properly initialized. Please restart the server."
         )
     conversation = await ghl_client.get_conversation(conversation_id, location_id)
-    messages = await ghl_client.get_messages(conversation_id, location_id, limit=50)
 
     # Format conversation as readable text
-    contact_name = conversation.contactName or conversation.fullName or "Unknown"
-    lines = [f"# Conversation with {contact_name}\n"]
-    lines.append(f"**ID:** {conversation.id}")
-    lines.append(f"**Contact:** {conversation.contactId}")
-    lines.append(f"**Location:** {conversation.locationId}")
+    lines = [f"# Conversation {conversation.id}\n"]
+    lines.append(f"- Contact ID: {conversation.contactId}")
+    lines.append(f"- Type: {conversation.type}")
+    if conversation.lastMessageType:
+        lines.append(f"- Last Message Type: {conversation.lastMessageType.value}")
+    if conversation.lastMessageAt:
+        lines.append(f"- Last Message: {conversation.lastMessageAt}")
+    lines.append(f"- Unread: {'Yes' if conversation.unread else 'No'}")
 
-    if conversation.email:
-        lines.append(f"**Email:** {conversation.email}")
-    if conversation.phone:
-        lines.append(f"**Phone:** {conversation.phone}")
-    if conversation.unreadCount > 0:
-        lines.append(f"**Unread Messages:** {conversation.unreadCount}")
-    if conversation.starred:
-        lines.append("**Status:** ⭐ Starred")
+    # Get recent messages
+    try:
+        messages_result = await ghl_client.get_messages(
+            conversation_id=conversation_id, location_id=location_id, limit=10
+        )
+        if messages_result.messages:
+            lines.append(f"\n## Recent Messages ({len(messages_result.messages)})")
+            for msg in messages_result.messages[-5:]:  # Show last 5 messages
+                lines.append(f"\n### Message {msg.id}")
+                if msg.body:
+                    lines.append(f"- Content: {msg.body[:100]}...")
+                lines.append(f"- Type: {msg.type}")
+                if msg.status:
+                    lines.append(f"- Status: {msg.status}")
+                if msg.dateAdded:
+                    lines.append(f"- Date: {msg.dateAdded}")
+    except Exception:
+        lines.append("\n## Recent Messages: Unable to load")
 
-    lines.append(
-        f"\n## Messages ({messages.count} of {messages.total or messages.count})\n"
+    return "\n".join(lines)
+
+
+@mcp.resource("opportunities://{location_id}")
+async def list_opportunities_resource(location_id: str) -> str:
+    """List all opportunities for a location as a resource"""
+    if ghl_client is None:
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
+    from .models.opportunity import OpportunitySearchFilters
+
+    # Get opportunities with no filters (all opportunities)
+    result = await ghl_client.get_opportunities(
+        location_id=location_id,
+        limit=100,
+        skip=0,
+        filters=OpportunitySearchFilters(),
     )
 
-    for msg in messages.messages:
-        direction = "→ Sent" if msg.direction == "outbound" else "← Received"
-        lines.append(f"### {msg.dateAdded} {direction}")
-        lines.append(f"- Type: {msg.type}")
-        lines.append(f"- Status: {msg.status}")
-        lines.append(f"- Message: {msg.body}")
-        if msg.attachments:
-            lines.append(f"- Attachments: {len(msg.attachments)}")
-        lines.append("")
+    # Format opportunities as readable text
+    lines = [f"# Opportunities for Location {location_id}\n"]
+    lines.append(f"Total opportunities: {result.total or result.count}\n")
+
+    for opportunity in result.opportunities:
+        lines.append(f"\n## {opportunity.name}")
+        lines.append(f"- ID: {opportunity.id}")
+        lines.append(f"- Contact ID: {opportunity.contactId}")
+        lines.append(f"- Pipeline ID: {opportunity.pipelineId}")
+        lines.append(f"- Stage ID: {opportunity.pipelineStageId}")
+        lines.append(f"- Status: {opportunity.status}")
+        if opportunity.monetaryValue:
+            lines.append(f"- Value: ${opportunity.monetaryValue:,.2f}")
+        if opportunity.assignedTo:
+            lines.append(f"- Assigned To: {opportunity.assignedTo}")
+        if opportunity.source:
+            lines.append(f"- Source: {opportunity.source}")
+        lines.append(f"- Created: {opportunity.createdAt}")
+        lines.append(f"- Updated: {opportunity.updatedAt}")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("opportunity://{location_id}/{opportunity_id}")
+async def get_opportunity_resource(location_id: str, opportunity_id: str) -> str:
+    """Get a single opportunity as a resource"""
+    if ghl_client is None:
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
+    opportunity = await ghl_client.get_opportunity(opportunity_id, location_id)
+
+    # Format opportunity as readable text
+    lines = [f"# Opportunity: {opportunity.name}\n"]
+    lines.append(f"- ID: {opportunity.id}")
+    lines.append(f"- Contact ID: {opportunity.contactId}")
+    lines.append(f"- Pipeline ID: {opportunity.pipelineId}")
+    lines.append(f"- Stage ID: {opportunity.pipelineStageId}")
+    lines.append(f"- Status: {opportunity.status}")
+    if opportunity.monetaryValue:
+        lines.append(f"- Value: ${opportunity.monetaryValue:,.2f}")
+    if opportunity.assignedTo:
+        lines.append(f"- Assigned To: {opportunity.assignedTo}")
+    if opportunity.source:
+        lines.append(f"- Source: {opportunity.source}")
+    if opportunity.notes:
+        lines.append(f"- Notes: {opportunity.notes}")
+    lines.append(f"- Created: {opportunity.createdAt}")
+    lines.append(f"- Updated: {opportunity.updatedAt}")
+    if opportunity.lastStatusChangeAt:
+        lines.append(f"- Last Status Change: {opportunity.lastStatusChangeAt}")
+    if opportunity.lastStageChangeAt:
+        lines.append(f"- Last Stage Change: {opportunity.lastStageChangeAt}")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("pipelines://{location_id}")
+async def list_pipelines_resource(location_id: str) -> str:
+    """List all pipelines for a location as a resource"""
+    if ghl_client is None:
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
+    pipelines = await ghl_client.get_pipelines(location_id)
+
+    # Format pipelines as readable text
+    lines = [f"# Pipelines for Location {location_id}\n"]
+    lines.append(f"Total pipelines: {len(pipelines)}\n")
+
+    for pipeline in pipelines:
+        lines.append(f"\n## {pipeline.name}")
+        lines.append(f"- ID: {pipeline.id}")
+        lines.append(f"- Location: {pipeline.locationId}")
+
+        # Get stages for this pipeline
+        try:
+            stages = await ghl_client.get_pipeline_stages(pipeline.id, location_id)
+            if stages:
+                lines.append(f"- Stages ({len(stages)}):")
+                for stage in stages:
+                    lines.append(
+                        f"  - {stage.name} (ID: {stage.id}, Position: {stage.position})"
+                    )
+        except Exception:
+            lines.append("- Stages: Unable to load")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("calendars://{location_id}")
+async def list_calendars_resource(location_id: str) -> str:
+    """List all calendars for a location as a resource"""
+    if ghl_client is None:
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
+    result = await ghl_client.get_calendars(location_id)
+
+    # Format calendars as readable text
+    lines = [f"# Calendars for Location {location_id}\n"]
+    lines.append(f"Total calendars: {result.count}\n")
+
+    for calendar in result.calendars:
+        lines.append(f"\n## {calendar.name}")
+        lines.append(f"- ID: {calendar.id}")
+        lines.append(f"- Location: {calendar.locationId}")
+        if calendar.description:
+            lines.append(f"- Description: {calendar.description}")
+        lines.append(f"- Widget Type: {calendar.widgetType}")
+        lines.append(f"- Widget Slug: {calendar.widgetSlug}")
+        if calendar.appointmentTitle:
+            lines.append(f"- Appointment Title: {calendar.appointmentTitle}")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("calendar://{location_id}/{calendar_id}")
+async def get_calendar_resource(location_id: str, calendar_id: str) -> str:
+    """Get a single calendar as a resource"""
+    if ghl_client is None:
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
+    calendar = await ghl_client.get_calendar(calendar_id, location_id)
+
+    # Format calendar as readable text
+    lines = [f"# Calendar: {calendar.name}\n"]
+    lines.append(f"- ID: {calendar.id}")
+    lines.append(f"- Location: {calendar.locationId}")
+    if calendar.description:
+        lines.append(f"- Description: {calendar.description}")
+    lines.append(f"- Widget Type: {calendar.widgetType}")
+    lines.append(f"- Widget Slug: {calendar.widgetSlug}")
+    if calendar.appointmentTitle:
+        lines.append(f"- Appointment Title: {calendar.appointmentTitle}")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("appointments://{location_id}/{calendar_id}")
+async def list_appointments_resource(location_id: str, calendar_id: str) -> str:
+    """List all appointments for a calendar as a resource"""
+    if ghl_client is None:
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
+    result = await ghl_client.get_appointments(
+        calendar_id=calendar_id, location_id=location_id, limit=100
+    )
+
+    # Format appointments as readable text
+    lines = [f"# Appointments for Calendar {calendar_id}\n"]
+    lines.append(f"Total appointments: {result.count}\n")
+
+    for appointment in result.appointments:
+        lines.append(f"\n## {appointment.title or 'Untitled Appointment'}")
+        lines.append(f"- ID: {appointment.id}")
+        lines.append(f"- Contact ID: {appointment.contactId}")
+        if appointment.startTime:
+            lines.append(f"- Start Time: {appointment.startTime}")
+        if appointment.endTime:
+            lines.append(f"- End Time: {appointment.endTime}")
+        if appointment.appointmentStatus:
+            lines.append(f"- Status: {appointment.appointmentStatus}")
+        if appointment.assignedUserId:
+            lines.append(f"- Assigned User: {appointment.assignedUserId}")
+        if appointment.notes:
+            lines.append(f"- Notes: {appointment.notes}")
+        if appointment.address:
+            lines.append(f"- Address: {appointment.address}")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("appointment://{location_id}/{appointment_id}")
+async def get_appointment_resource(location_id: str, appointment_id: str) -> str:
+    """Get a single appointment as a resource"""
+    if ghl_client is None:
+        raise RuntimeError(
+            "MCP server not properly initialized. Please restart the server."
+        )
+    appointment = await ghl_client.get_appointment(appointment_id, location_id)
+
+    # Format appointment as readable text
+    lines = [f"# Appointment: {appointment.title or 'Untitled'}\n"]
+    lines.append(f"- ID: {appointment.id}")
+    lines.append(f"- Calendar ID: {appointment.calendarId}")
+    lines.append(f"- Contact ID: {appointment.contactId}")
+    if appointment.startTime:
+        lines.append(f"- Start Time: {appointment.startTime}")
+    if appointment.endTime:
+        lines.append(f"- End Time: {appointment.endTime}")
+    if appointment.appointmentStatus:
+        lines.append(f"- Status: {appointment.appointmentStatus}")
+    if appointment.assignedUserId:
+        lines.append(f"- Assigned User: {appointment.assignedUserId}")
+    if appointment.notes:
+        lines.append(f"- Notes: {appointment.notes}")
+    if appointment.address:
+        lines.append(f"- Address: {appointment.address}")
 
     return "\n".join(lines)
 
@@ -889,33 +529,20 @@ def main():
                         file=sys.stderr,
                     )
                     return False
-
-                # Try to validate existing config
-                config_valid = await setup.validate_existing_config()
-                if not config_valid:
-                    print(
-                        "ERROR: Configuration validation failed. Please run 'python -m src.main' manually to re-setup.",
-                        file=sys.stderr,
-                    )
-                    return False
-
                 return True
 
-        setup_success = asyncio.run(silent_check())
-        if not setup_success:
+        setup_result = asyncio.run(silent_check())
+        if not setup_result:
             sys.exit(1)
     else:
-        # Manual mode - run full interactive setup if needed
+        # Manual/interactive mode - run full startup check and setup
+        print("👋 Welcome! Let's set up your GoHighLevel MCP Server.\n")
         setup_result = asyncio.run(startup_check_and_setup())
 
-        if setup_result == "exit_after_setup":
-            # Standard mode setup completed successfully, exit gracefully
-            sys.exit(0)
-        elif setup_result == "exit_after_custom_setup":
-            # Custom mode setup completed successfully, exit gracefully
-            sys.exit(0)
-        elif setup_result == "exit_after_custom_instructions":
-            # Custom mode instructions shown, exit gracefully
+        # Handle different return values from startup_check_and_setup
+        if setup_result == "exit_after_custom_instructions":
+            print("\n🎯 Next step: Create your GoHighLevel Marketplace App")
+            print("   Then run this command again to continue setup.\n")
             sys.exit(0)
         elif not setup_result:
             print("🛑 Server startup failed due to setup failure.")
@@ -923,6 +550,9 @@ def main():
 
     # Initialize clients after successful setup
     initialize_clients()
+
+    # Register all tools with the MCP server
+    register_all_tools()
 
     if not is_mcp_mode:
         print("🚀 Starting MCP server...")

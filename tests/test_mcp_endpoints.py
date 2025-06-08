@@ -280,7 +280,9 @@ class TestMCPClientHelpers:
 
         with patch("src.main.oauth_service", AsyncMock()):
             with patch("src.main.ghl_client", AsyncMock()):
-                with patch("src.main.GoHighLevelClient") as mock_client_class:
+                with patch(
+                    "src.utils.client_helpers.GoHighLevelClient"
+                ) as mock_client_class:
                     mock_client_instance = AsyncMock()
                     mock_client_class.return_value = mock_client_instance
 
