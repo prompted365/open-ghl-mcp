@@ -6,7 +6,6 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 ## Features
 
 - 🔐 **OAuth 2.0 Authentication**: Full OAuth flow with automatic token management by default
-- 🌟 **Custom Authentication**: Manual authentication with your own Marketplace App credentials available
 - 🏢 **Multi-location Support**: Works with agency accounts to manage multiple sub-accounts
 - 👥 **Contact Management**: Complete CRUD operations for contacts
 - 💬 **Conversations**: Search conversations, view messages, and manage messaging
@@ -20,7 +19,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 - Python 3.12+
 - `uv` package manager (or pip)
 - One of the following:
-  - **Standard Mode Configuration**: Access via our hosted GoHighLevel app (recommended)
+  - **Standard Mode Configuration**: Access via our hosted GoHighLevel app (coming soon)
   - **Custom Mode Configuration**: Your own GoHighLevel Marketplace App credentials
 
 ## Installation
@@ -109,7 +108,7 @@ This MCP server provides comprehensive access to GoHighLevel API v2 through both
 | `add_contact_tags` | `POST /contacts/{id}/tags` | Add tags to a contact |
 | `remove_contact_tags` | `DELETE /contacts/{id}/tags` | Remove tags from a contact |
 
-#### 💬 Conversations & Messaging  
+#### 💬 Conversations & Messaging
 | Tool | GoHighLevel Endpoint | Description |
 |------|---------------------|-------------|
 | `get_conversations` | `GET /conversations/search` | Search and list conversations |
@@ -145,7 +144,7 @@ This MCP server provides comprehensive access to GoHighLevel API v2 through both
 | `upload_form_file` | `POST /forms/upload-custom-files` | Upload file to custom field |
 
 > **Note**: Limited API support for forms. The following are NOT available:
-> - `GET /forms/{id}` (401 "Route not supported")  
+> - `GET /forms/{id}` (401 "Route not supported")
 > - `GET /forms/{id}/submissions` (404 Not Found)
 > - `POST /forms/submit` (401 Unauthorized)
 
@@ -157,7 +156,7 @@ This MCP server provides comprehensive access to GoHighLevel API v2 through both
 | `contacts://{location_id}` | `GET /contacts` | Browse all contacts for location |
 | `contact://{location_id}/{contact_id}` | `GET /contacts/{id}` | View single contact details |
 
-#### 💬 Conversation Resources  
+#### 💬 Conversation Resources
 | Resource URI | GoHighLevel Endpoint | Description |
 |-------------|---------------------|-------------|
 | `conversations://{location_id}` | `GET /conversations/search` | Browse all conversations for location |
@@ -191,7 +190,7 @@ All endpoints require proper authentication:
 # Get all contacts for your location
 contacts://YOUR_LOCATION_ID
 
-# Get specific contact details  
+# Get specific contact details
 contact://YOUR_LOCATION_ID/YOUR_CONTACT_ID
 
 # Browse appointments for a contact
