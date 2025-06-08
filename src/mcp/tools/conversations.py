@@ -120,7 +120,7 @@ def _register_conversation_tools(_mcp, _get_client):
         params: UpdateMessageStatusParams,
     ) -> Dict[str, Any]:
         """Update the status of a message
-        
+
         NOTE: This is only supported for custom conversation providers (Marketplace App feature).
         Regular messages cannot have their status updated via API.
         """
@@ -130,5 +130,5 @@ def _register_conversation_tools(_mcp, _get_client):
             "message": (
                 "Message status updates are only supported for custom conversation providers. "
                 "This is a Marketplace App feature and not available for standard messages."
-            )
+            ),
         }

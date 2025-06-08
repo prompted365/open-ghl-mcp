@@ -13,7 +13,7 @@ from .services.setup import StandardModeSetup
 from .utils.client_helpers import get_client_with_token_override
 
 # Import parameter classes
-from .mcp.params import *
+from .mcp.params import *  # noqa: F403, F401
 
 # Import tools and resources registration functions
 from .mcp.tools.contacts import _register_contact_tools
@@ -243,10 +243,10 @@ async def list_conversations_resource(location_id: str) -> str:
         lines.append(f"- Contact ID: {conversation.contactId}")
         lines.append(f"- Type: {conversation.type}")
         if conversation.lastMessageType:
-            lines.append(f"- Last Message Type: {conversation.lastMessageType.value}")
-        if conversation.lastMessageAt:
-            lines.append(f"- Last Message: {conversation.lastMessageAt}")
-        lines.append(f"- Unread: {'Yes' if conversation.unread else 'No'}")
+            lines.append(f"- Last Message Type: {conversation.lastMessageType}")
+        if conversation.lastMessageDate:
+            lines.append(f"- Last Message: {conversation.lastMessageDate}")
+        lines.append(f"- Unread: {'Yes' if conversation.unreadCount > 0 else 'No'}")
 
     return "\n".join(lines)
 
@@ -265,10 +265,10 @@ async def get_conversation_resource(location_id: str, conversation_id: str) -> s
     lines.append(f"- Contact ID: {conversation.contactId}")
     lines.append(f"- Type: {conversation.type}")
     if conversation.lastMessageType:
-        lines.append(f"- Last Message Type: {conversation.lastMessageType.value}")
-    if conversation.lastMessageAt:
-        lines.append(f"- Last Message: {conversation.lastMessageAt}")
-    lines.append(f"- Unread: {'Yes' if conversation.unread else 'No'}")
+        lines.append(f"- Last Message Type: {conversation.lastMessageType}")
+    if conversation.lastMessageDate:
+        lines.append(f"- Last Message: {conversation.lastMessageDate}")
+    lines.append(f"- Unread: {'Yes' if conversation.unreadCount > 0 else 'No'}")
 
     # Get recent messages
     try:
@@ -306,7 +306,16 @@ async def list_opportunities_resource(location_id: str) -> str:
         location_id=location_id,
         limit=100,
         skip=0,
-        filters=OpportunitySearchFilters(),
+        filters=OpportunitySearchFilters(
+            pipelineId=None,
+            pipelineStageId=None,
+            assignedTo=None,
+            status=None,
+            contactId=None,
+            startDate=None,
+            endDate=None,
+            query=None,
+        ),
     )
 
     # Format opportunities as readable text
@@ -382,19 +391,17 @@ async def list_pipelines_resource(location_id: str) -> str:
     for pipeline in pipelines:
         lines.append(f"\n## {pipeline.name}")
         lines.append(f"- ID: {pipeline.id}")
-        lines.append(f"- Location: {pipeline.locationId}")
+        lines.append(f"- Location: {location_id}")
 
-        # Get stages for this pipeline
-        try:
-            stages = await ghl_client.get_pipeline_stages(pipeline.id, location_id)
-            if stages:
-                lines.append(f"- Stages ({len(stages)}):")
-                for stage in stages:
-                    lines.append(
-                        f"  - {stage.name} (ID: {stage.id}, Position: {stage.position})"
-                    )
-        except Exception:
-            lines.append("- Stages: Unable to load")
+        # Show stages if available
+        if pipeline.stages:
+            lines.append(f"- Stages ({len(pipeline.stages)}):")
+            for stage in pipeline.stages:
+                lines.append(
+                    f"  - {stage.name} (ID: {stage.id}, Position: {stage.position})"
+                )
+        else:
+            lines.append("- Stages: None listed")
 
     return "\n".join(lines)
 
@@ -418,10 +425,10 @@ async def list_calendars_resource(location_id: str) -> str:
         lines.append(f"- Location: {calendar.locationId}")
         if calendar.description:
             lines.append(f"- Description: {calendar.description}")
-        lines.append(f"- Widget Type: {calendar.widgetType}")
-        lines.append(f"- Widget Slug: {calendar.widgetSlug}")
-        if calendar.appointmentTitle:
-            lines.append(f"- Appointment Title: {calendar.appointmentTitle}")
+        if calendar.widgetSlug:
+            lines.append(f"- Widget Slug: {calendar.widgetSlug}")
+        if calendar.eventTitle:
+            lines.append(f"- Event Title: {calendar.eventTitle}")
 
     return "\n".join(lines)
 
@@ -441,10 +448,10 @@ async def get_calendar_resource(location_id: str, calendar_id: str) -> str:
     lines.append(f"- Location: {calendar.locationId}")
     if calendar.description:
         lines.append(f"- Description: {calendar.description}")
-    lines.append(f"- Widget Type: {calendar.widgetType}")
-    lines.append(f"- Widget Slug: {calendar.widgetSlug}")
-    if calendar.appointmentTitle:
-        lines.append(f"- Appointment Title: {calendar.appointmentTitle}")
+    if calendar.widgetSlug:
+        lines.append(f"- Widget Slug: {calendar.widgetSlug}")
+    if calendar.eventTitle:
+        lines.append(f"- Event Title: {calendar.eventTitle}")
 
     return "\n".join(lines)
 

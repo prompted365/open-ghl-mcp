@@ -271,8 +271,6 @@ class TestGoHighLevelClient:
             "delete_opportunity",
             "update_opportunity_status",
             "get_pipelines",
-            "get_pipeline",
-            "get_pipeline_stages",
         ]
 
         for method_name in opportunity_methods:

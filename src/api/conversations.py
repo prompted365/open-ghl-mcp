@@ -139,7 +139,7 @@ class ConversationsClient(BaseGoHighLevelClient):
         self, message_id: str, status: str, location_id: str
     ) -> Message:
         """Update the status of a message
-        
+
         NOTE: This endpoint is only for custom conversation providers (Marketplace App feature).
         Regular messages cannot have their status updated via API.
         """

@@ -68,10 +68,14 @@ class Pipeline(BaseModel):
     name: str = Field(..., description="Pipeline name")
     # locationId not returned in list response
     stages: Optional[List["PipelineStage"]] = Field(None, description="Pipeline stages")
-    dateAdded: Optional[Union[datetime, str]] = Field(None, description="Date pipeline was added")
-    dateUpdated: Optional[Union[datetime, str]] = Field(None, description="Date pipeline was updated")
+    dateAdded: Optional[Union[datetime, str]] = Field(
+        None, description="Date pipeline was added"
+    )
+    dateUpdated: Optional[Union[datetime, str]] = Field(
+        None, description="Date pipeline was updated"
+    )
     originId: Optional[str] = Field(None, description="Origin ID")
-    
+
     @field_validator("dateAdded", "dateUpdated", mode="before")
     @classmethod
     def parse_datetime(cls, v):
@@ -79,6 +83,7 @@ class Pipeline(BaseModel):
         if isinstance(v, str):
             # Handle GoHighLevel datetime format: "2025-06-08T03:01:58.848Z"
             from datetime import datetime
+
             try:
                 if v.endswith("Z"):
                     # Remove Z and add timezone info
@@ -226,11 +231,15 @@ class Opportunity(BaseModel):
     attributions: List[Attribution] = Field(
         default_factory=list, description="Attribution data"
     )
-    
+
     # Additional fields from single opportunity response
     isAttribute: Optional[bool] = Field(None, description="Is attribute flag")
-    lastActionDate: Optional[Union[datetime, str]] = Field(None, description="Last action date")
-    internalSource: Optional[Dict[str, Any]] = Field(None, description="Internal source information")
+    lastActionDate: Optional[Union[datetime, str]] = Field(
+        None, description="Last action date"
+    )
+    internalSource: Optional[Dict[str, Any]] = Field(
+        None, description="Internal source information"
+    )
 
     # Pipeline information (populated in responses)
     pipeline: Optional[Pipeline] = Field(None, description="Pipeline details")

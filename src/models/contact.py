@@ -56,6 +56,7 @@ class Contact(BaseModel):
     postalCode: Optional[str] = None
     website: Optional[str] = None
     timezone: Optional[str] = None
+    companyName: Optional[str] = None
     dnd: bool = False
     dndSettings: Optional[Dict[str, Any]] = None
     tags: List[str] = Field(default_factory=list)

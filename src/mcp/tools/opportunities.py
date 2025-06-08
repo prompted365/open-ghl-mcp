@@ -91,7 +91,6 @@ def _register_opportunity_tools(_mcp, _get_client, _oauth_service):
             monetaryValue=params.monetary_value,
             assignedTo=params.assigned_to,
             source=params.source,
-            notes=params.notes,
             customFields=(
                 [
                     {"key": k, "value": v}
@@ -111,14 +110,12 @@ def _register_opportunity_tools(_mcp, _get_client, _oauth_service):
         client = await get_client(params.access_token)
 
         update_data = OpportunityUpdate(
-            locationId=params.location_id,
             name=params.name,
             pipelineStageId=params.pipeline_stage_id,
             status=params.status,
             monetaryValue=params.monetary_value,
             assignedTo=params.assigned_to,
             source=params.source,
-            notes=params.notes,
             customFields=(
                 [
                     {"key": k, "value": v}
@@ -169,7 +166,7 @@ def _register_opportunity_tools(_mcp, _get_client, _oauth_service):
     @mcp.tool()
     async def get_pipelines(params: GetPipelinesParams) -> Dict[str, Any]:
         """Get all pipelines for a location
-        
+
         NOTE: This is the only pipeline endpoint that exists in the API.
         Individual pipeline and stage endpoints do not exist.
         Stages are included in each pipeline object.

@@ -10,7 +10,6 @@ from ..models.opportunity import (
     OpportunitySearchResult,
     OpportunitySearchFilters,
     Pipeline,
-    PipelineStage,
 )
 
 
@@ -99,7 +98,7 @@ class OpportunitiesClient(BaseGoHighLevelClient):
         self, opportunity_id: str, status: str, location_id: str
     ) -> Opportunity:
         """Update opportunity status"""
-        response = await self._request(
+        await self._request(
             "PUT",
             f"/opportunities/{opportunity_id}/status",
             json={"status": status},  # Note: locationId NOT in body
@@ -111,15 +110,15 @@ class OpportunitiesClient(BaseGoHighLevelClient):
 
     async def get_pipelines(self, location_id: str) -> List[Pipeline]:
         """Get all pipelines for a location
-        
+
         NOTE: This is the only pipeline endpoint that exists in the API.
         Individual pipeline and stage endpoints do not exist.
         """
         response = await self._request(
-            "GET", 
-            "/opportunities/pipelines", 
+            "GET",
+            "/opportunities/pipelines",
             params={"locationId": location_id},
-            location_id=location_id
+            location_id=location_id,
         )
         data = response.json()
         return [Pipeline(**p) for p in data.get("pipelines", [])]

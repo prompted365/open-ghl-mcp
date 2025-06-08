@@ -3,7 +3,7 @@
 from datetime import datetime, date
 from typing import Dict, Any
 
-from ...models.calendar import AppointmentCreate, AppointmentUpdate
+from ...models.calendar import AppointmentCreate, AppointmentUpdate, AppointmentStatus
 from ..params.calendars import (
     GetAppointmentsParams,
     GetAppointmentParams,
@@ -78,10 +78,17 @@ def _register_calendar_tools(_mcp, _get_client):
             startTime=start_time,
             endTime=end_time,
             title=params.title,
-            appointmentStatus=params.appointment_status,
+            meetingLocationType=None,  # Default/optional
+            appointmentStatus=(
+                AppointmentStatus(params.appointment_status)
+                if params.appointment_status
+                else AppointmentStatus.CONFIRMED
+            ),
             assignedUserId=params.assigned_user_id,
             notes=params.notes,
             address=params.address,
+            ignoreDateRange=None,  # Default/optional
+            toNotify=None,  # Default/optional
         )
 
         appointment = await client.create_appointment(appointment_data)
@@ -106,10 +113,16 @@ def _register_calendar_tools(_mcp, _get_client):
             startTime=start_time,
             endTime=end_time,
             title=params.title,
-            appointmentStatus=params.appointment_status,
+            meetingLocationType=None,  # Default/optional
+            appointmentStatus=(
+                AppointmentStatus(params.appointment_status)
+                if params.appointment_status
+                else None
+            ),
             assignedUserId=params.assigned_user_id,
             notes=params.notes,
             address=params.address,
+            toNotify=None,  # Default/optional
         )
 
         appointment = await client.update_appointment(

@@ -20,7 +20,6 @@ from ..models.opportunity import (
     OpportunitySearchResult,
     OpportunitySearchFilters,
     Pipeline,
-    PipelineStage,
 )
 from ..models.calendar import (
     Appointment,
@@ -249,7 +248,7 @@ class GoHighLevelClient:
 
     async def get_pipelines(self, location_id: str) -> List[Pipeline]:
         """Get all pipelines for a location
-        
+
         NOTE: This is the only pipeline endpoint that exists in the API.
         Individual pipeline and stage endpoints do not exist.
         """
