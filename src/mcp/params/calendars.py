@@ -5,17 +5,10 @@ from pydantic import BaseModel, Field
 
 
 class GetAppointmentsParams(BaseModel):
-    """Parameters for getting appointments"""
+    """Parameters for getting appointments for a contact"""
 
-    calendar_id: str = Field(..., description="The calendar ID")
+    contact_id: str = Field(..., description="The contact ID")
     location_id: str = Field(..., description="The location ID")
-    limit: int = Field(100, description="Number of results to return", ge=1, le=100)
-    skip: int = Field(0, description="Number of results to skip", ge=0)
-    start_date: Optional[str] = Field(
-        None, description="Start date filter (YYYY-MM-DD)"
-    )
-    end_date: Optional[str] = Field(None, description="End date filter (YYYY-MM-DD)")
-    user_id: Optional[str] = Field(None, description="Filter by user ID")
     access_token: Optional[str] = Field(
         None, description="Optional access token to use instead of stored token"
     )

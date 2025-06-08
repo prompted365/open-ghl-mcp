@@ -23,30 +23,16 @@ class CalendarsClient(BaseGoHighLevelClient):
 
     async def get_appointments(
         self,
-        calendar_id: str,
+        contact_id: str,
         location_id: str,
-        limit: int = 100,
-        skip: int = 0,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        user_id: Optional[str] = None,
     ) -> AppointmentList:
-        """Get appointments for a calendar"""
-        params = {"locationId": location_id, "calendarId": calendar_id, "limit": limit}
+        """Get appointments for a contact
 
-        if skip > 0:
-            params["skip"] = skip
-        if start_date:
-            params["startTime"] = start_date.isoformat()
-        if end_date:
-            params["endTime"] = end_date.isoformat()
-        if user_id:
-            params["userId"] = user_id
-
+        Note: Appointments belong to contacts, not calendars.
+        """
         response = await self._request(
             "GET",
-            "/calendars/events",
-            params=params,
+            f"/contacts/{contact_id}/appointments",
             location_id=location_id,
         )
         data = response.json()

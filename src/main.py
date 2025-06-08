@@ -456,19 +456,19 @@ async def get_calendar_resource(location_id: str, calendar_id: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.resource("appointments://{location_id}/{calendar_id}")
-async def list_appointments_resource(location_id: str, calendar_id: str) -> str:
-    """List all appointments for a calendar as a resource"""
+@mcp.resource("appointments://{location_id}/{contact_id}")
+async def list_appointments_resource(location_id: str, contact_id: str) -> str:
+    """List all appointments for a contact as a resource"""
     if ghl_client is None:
         raise RuntimeError(
             "MCP server not properly initialized. Please restart the server."
         )
     result = await ghl_client.get_appointments(
-        calendar_id=calendar_id, location_id=location_id, limit=100
+        contact_id=contact_id, location_id=location_id
     )
 
     # Format appointments as readable text
-    lines = [f"# Appointments for Calendar {calendar_id}\n"]
+    lines = [f"# Appointments for Contact {contact_id}\n"]
     lines.append(f"Total appointments: {result.count}\n")
 
     for appointment in result.appointments:

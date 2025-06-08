@@ -258,23 +258,13 @@ class GoHighLevelClient:
 
     async def get_appointments(
         self,
-        calendar_id: str,
+        contact_id: str,
         location_id: str,
-        limit: int = 100,
-        skip: int = 0,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        user_id: Optional[str] = None,
     ) -> AppointmentList:
-        """Get appointments for a calendar"""
+        """Get appointments for a contact"""
         return await self._calendars.get_appointments(
-            calendar_id=calendar_id,
+            contact_id=contact_id,
             location_id=location_id,
-            limit=limit,
-            skip=skip,
-            start_date=start_date,
-            end_date=end_date,
-            user_id=user_id,
         )
 
     async def get_appointment(

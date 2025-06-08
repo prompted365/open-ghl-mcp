@@ -30,25 +30,12 @@ def _register_calendar_tools(_mcp, _get_client):
 
     @mcp.tool()
     async def get_appointments(params: GetAppointmentsParams) -> Dict[str, Any]:
-        """Get appointments for a calendar"""
+        """Get appointments for a contact"""
         client = await get_client(params.access_token)
 
-        # Convert string dates to date objects if provided
-        start_date = None
-        end_date = None
-        if params.start_date:
-            start_date = date.fromisoformat(params.start_date)
-        if params.end_date:
-            end_date = date.fromisoformat(params.end_date)
-
         appointments = await client.get_appointments(
-            calendar_id=params.calendar_id,
+            contact_id=params.contact_id,
             location_id=params.location_id,
-            limit=params.limit,
-            skip=params.skip,
-            start_date=start_date,
-            end_date=end_date,
-            user_id=params.user_id,
         )
         return {"success": True, "appointments": appointments.model_dump()}
 
