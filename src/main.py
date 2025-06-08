@@ -97,7 +97,9 @@ async def startup_check_and_setup():
                     # Custom setup completed successfully
                     setup.clear_custom_mode_choice()
                     print("✅ Custom mode setup completed successfully!")
-                    return True
+                    # Show Claude Desktop configuration instructions
+                    setup.show_claude_desktop_instructions()
+                    return "exit_after_setup"
                 else:
                     print("❌ Custom setup was not completed successfully.")
                     print("   Please run the server again to retry setup.\n")
@@ -113,11 +115,13 @@ async def startup_check_and_setup():
                     return False
 
                 print("✅ Standard mode setup completed successfully!")
-                return True
+                # Show Claude Desktop configuration instructions
+                setup.show_claude_desktop_instructions()
+                return "exit_after_setup"
 
         # Show Claude Desktop configuration instructions
         setup.show_claude_desktop_instructions()
-        return True
+        return "exit_after_setup"
 
 
 # Initialize FastMCP server
@@ -549,7 +553,11 @@ def main():
         setup_result = asyncio.run(startup_check_and_setup())
 
         # Handle different return values from startup_check_and_setup
-        if setup_result == "exit_after_custom_instructions":
+        if setup_result == "exit_after_setup":
+            print("\n🎯 Setup complete! Your GoHighLevel MCP Server is ready.")
+            print("   Add the server configuration shown above to Claude Desktop.\n")
+            sys.exit(0)
+        elif setup_result == "exit_after_custom_instructions":
             print("\n🎯 Next step: Create your GoHighLevel Marketplace App")
             print("   Then run this command again to continue setup.\n")
             sys.exit(0)
