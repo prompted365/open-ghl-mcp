@@ -22,7 +22,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
   - **Standard Mode Configuration**: Access via our hosted GoHighLevel app (coming soon)
   - **Custom Mode Configuration**: Your own GoHighLevel Marketplace App credentials
 
-## Installation
+## Getting Started - Installation
 
 1. Clone the repository:
 ```bash
@@ -41,36 +41,16 @@ uv pip install -r requirements.txt
 python -m src.main
 ```
 
-## Configuration
-
-This MCP server supports two authentication modes:
-
-### Option 1: Standard Mode (Recommended)
-
-Use our hosted GoHighLevel app with zero configuration:
-
-1. Run the MCP server
-2. Follow the setup wizard to install our app
-3. Complete the OAuth flow
-4. Configure your LLM to use the MCP server
-
-*No .env file or manual configuration required.*
-
-### Option 2: Custom Mode
+## 1. Configuration
 
 Use your own GoHighLevel Marketplace App:
 
 1. Create your own GoHighLevel Marketplace App
 2. Set the redirect URL to: `http://localhost:8080/oauth/callback`
-3. Configure your `.env` file:
+3. Set the permissions you want for the tools and resources below
 
-```env
-AUTH_MODE=custom
-GHL_CLIENT_ID=your-client-id
-GHL_CLIENT_SECRET=your-client-secret
-```
 
-## Usage
+## 2. Usage
 
 ### Running the MCP Server
 
@@ -79,17 +59,15 @@ GHL_CLIENT_SECRET=your-client-secret
 python -m src.main
 ```
 
-2. Configure your LLM to use the MCP server
+2. Complete the setup wizard.
+
+3. Configure your LLM to use the MCP server
 
 ### First-time Authentication
 
-#### Standard Mode
-1. The server will prompt you to install the Basic Machines Marketplace App
-2. Follow the provided link to complete OAuth through the Marketplace App
-3. Security Tokens are managed automatically by Basic Machines
-
-#### Custom Mode
-1. The server will read the .env file and use the credentials to authenticate with GoHighLevel
+#### Custom Mode Setup
+1. The server will ask you for your GHL Marketplace App Client ID and Secret
+2. Install your App to generate an OAuth Token
 
 ## API Reference
 
