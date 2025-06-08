@@ -170,28 +170,25 @@ class StandardModeSetup:
     def choose_auth_mode(self) -> str:
         """Let user choose between Standard and Custom authentication mode"""
         print("\n🚀 Welcome to GoHighLevel MCP Server!\n")
-        print("Choose your authentication mode:\n")
-
-        print("📋 1. Standard Mode (Recommended)")
-        print("   • Zero configuration required")
-        print("   • Uses Basic Machines' hosted app")
-        print("   • Quick setup through marketplace")
-        print("   • Automatically managed authentication\n")
-
-        print("🔧 2. Custom Mode (Advanced)")
+        print("Setting up in Custom Mode Authentication...")
+        print("\n🔧 Custom Mode Setup")
         print("   • Use your own GoHighLevel Marketplace App")
         print("   • Requires creating app in GHL Developer Portal")
         print("   • Manual configuration with .env file")
         print("   • Full control over OAuth settings\n")
 
-        while True:
-            choice = input("Enter 1 for Standard or 2 for Custom [1]: ").strip()
-            if choice == "" or choice == "1":
-                return "standard"
-            elif choice == "2":
-                return "custom"
-            else:
-                print("Please enter 1 or 2.")
+        # Automatically return custom mode for early release
+        return "custom"
+
+        # while True:
+        #     choice = input("Enter 1 for Standard or 2 for Custom [1]: ").strip()
+        #     if choice == "" or choice == "1":
+        #         return "standard"
+        #     elif choice == "2":
+        #         return "custom"
+        #     else:
+        #         print("Please enter 1 or 2.")
+
 
     async def interactive_custom_setup(self) -> bool:
         """Interactive setup for custom mode"""
