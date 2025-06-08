@@ -27,7 +27,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with th
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/open-ghl-mcp.git
+git clone https://github.com/basicmachines-co/open-ghl-mcp.git
 cd open-ghl-mcp
 ```
 2. Install dependencies:
@@ -92,45 +92,128 @@ python -m src.main
 #### Custom Mode
 1. The server will read the .env file and use the credentials to authenticate with GoHighLevel
 
-### Available MCP Tools
+## API Reference
 
-#### Contact Management
-- `create_contact` - Create a new contact
-- `update_contact` - Update existing contact
-- `delete_contact` - Delete a contact
-- `get_contact` - Get a single contact
-- `search_contacts` - Search contacts with filters
-- `add_contact_tags` - Add tags to a contact
-- `remove_contact_tags` - Remove tags from a contact
+This MCP server provides comprehensive access to GoHighLevel API v2 through both **Tools** (for actions) and **Resources** (for data browsing). All endpoints are fully tested and validated.
 
-#### Conversation Management
-- `get_conversations` - Search and list conversations
-- `get_conversation` - Get a single conversation
-- `get_messages` - Get messages from a conversation
-- `send_message` - Send messages (SMS ✅, Email ✅, WhatsApp, IG, FB, Custom, Live_Chat)
-- `update_message_status` - Update message delivery status
+### 🛠️ MCP Tools (Actions)
 
-#### Forms Management
-- `get_forms` - List all forms for a location (basic info only: id, name, locationId)
-- `get_all_form_submissions` - Get all form submissions across all forms with filtering
-- `upload_form_file` - Upload file to a form's custom field (requires contact ID)
+#### 👥 Contact Management
+| Tool | GoHighLevel Endpoint | Description |
+|------|---------------------|-------------|
+| `create_contact` | `POST /contacts` | Create a new contact |
+| `update_contact` | `PUT /contacts/{id}` | Update existing contact |
+| `delete_contact` | `DELETE /contacts/{id}` | Delete a contact |
+| `get_contact` | `GET /contacts/{id}` | Get a single contact |
+| `search_contacts` | `GET /contacts` | Search contacts with filters |
+| `add_contact_tags` | `POST /contacts/{id}/tags` | Add tags to a contact |
+| `remove_contact_tags` | `DELETE /contacts/{id}/tags` | Remove tags from a contact |
 
-Note: The GoHighLevel API has limited forms support. The following are NOT available:
-- Getting detailed form structure with fields
-- Getting submissions for a specific form
-- Submitting forms programmatically
+#### 💬 Conversations & Messaging  
+| Tool | GoHighLevel Endpoint | Description |
+|------|---------------------|-------------|
+| `get_conversations` | `GET /conversations/search` | Search and list conversations |
+| `get_conversation` | `GET /conversations/{id}` | Get a single conversation |
+| `get_messages` | `GET /conversations/{id}/messages` | Get messages from a conversation |
+| `send_message` | `POST /conversations/{id}/messages` | Send messages (SMS ✅, Email ✅, WhatsApp, IG, FB, Custom, Live_Chat) |
+| `update_message_status` | `PUT /conversations/messages/{messageId}/status` | Update message delivery status |
 
-#### Available Resources
-- `contacts://{location_id}` - List all contacts for a location
-- `contact://{location_id}/{contact_id}` - Get a single contact details
-- `conversations://{location_id}` - List all conversations for a location
-- `conversation://{location_id}/{conversation_id}` - Get conversation with messages
+#### 🎯 Opportunities & Sales Pipeline
+| Tool | GoHighLevel Endpoint | Description |
+|------|---------------------|-------------|
+| `get_opportunities` | `GET /opportunities/search` | Search opportunities with filters |
+| `get_opportunity` | `GET /opportunities/{id}` | Get a single opportunity |
+| `create_opportunity` | `POST /opportunities` | Create new opportunity |
+| `update_opportunity` | `PUT /opportunities/{id}` | Update existing opportunity |
+| `delete_opportunity` | `DELETE /opportunities/{id}` | Delete opportunity |
+| `update_opportunity_status` | `PUT /opportunities/{id}/status` | Update opportunity status |
+| `get_pipelines` | `GET /opportunities/pipelines` | List all pipelines |
+
+#### 📅 Calendar & Appointments
+| Tool | GoHighLevel Endpoint | Description |
+|------|---------------------|-------------|
+| `get_calendars` | `GET /calendars/?locationId={id}` | List all calendars for location |
+| `get_calendar` | `GET /calendars/{id}` | Get calendar details (54+ fields) |
+| `get_appointments` | `GET /contacts/{contactId}/appointments` | Get appointments for contact |
+| `get_free_slots` | `GET /calendars/{id}/free-slots` | Get available time slots |
+
+#### 📝 Forms & Submissions
+| Tool | GoHighLevel Endpoint | Description |
+|------|---------------------|-------------|
+| `get_forms` | `GET /forms` | List all forms (basic info: id, name, locationId) |
+| `get_all_form_submissions` | `GET /forms/submissions` | Get all submissions with filtering |
+| `upload_form_file` | `POST /forms/upload-custom-files` | Upload file to custom field |
+
+> **Note**: Limited API support for forms. The following are NOT available:
+> - `GET /forms/{id}` (401 "Route not supported")  
+> - `GET /forms/{id}/submissions` (404 Not Found)
+> - `POST /forms/submit` (401 Unauthorized)
+
+### 📖 MCP Resources (Data Browsing)
+
+#### 👥 Contact Resources
+| Resource URI | GoHighLevel Endpoint | Description |
+|-------------|---------------------|-------------|
+| `contacts://{location_id}` | `GET /contacts` | Browse all contacts for location |
+| `contact://{location_id}/{contact_id}` | `GET /contacts/{id}` | View single contact details |
+
+#### 💬 Conversation Resources  
+| Resource URI | GoHighLevel Endpoint | Description |
+|-------------|---------------------|-------------|
+| `conversations://{location_id}` | `GET /conversations/search` | Browse all conversations for location |
+| `conversation://{location_id}/{conversation_id}` | `GET /conversations/{id}` | View conversation with messages |
+
+#### 🎯 Opportunity Resources
+| Resource URI | GoHighLevel Endpoint | Description |
+|-------------|---------------------|-------------|
+| `opportunities://{location_id}` | `GET /opportunities/search` | Browse all opportunities for location |
+| `opportunity://{location_id}/{opportunity_id}` | `GET /opportunities/{id}` | View single opportunity details |
+| `pipelines://{location_id}` | `GET /opportunities/pipelines` | Browse all pipelines with stages |
+
+#### 📅 Calendar Resources
+| Resource URI | GoHighLevel Endpoint | Description |
+|-------------|---------------------|-------------|
+| `calendars://{location_id}` | `GET /calendars/` | Browse all calendars for location |
+| `calendar://{location_id}/{calendar_id}` | `GET /calendars/{id}` | View calendar details |
+| `appointments://{location_id}/{contact_id}` | `GET /contacts/{id}/appointments` | Browse appointments for contact |
+
+### 🔐 Authentication Requirements
+
+All endpoints require proper authentication:
+
+- **Company Token**: Used for location token exchange
+- **Location Token**: Required for all location-specific operations (expires every 24 hours)
+- **Automatic Refresh**: The MCP server handles token refresh automatically
+
+### 📋 Example Usage
+
+```bash
+# Get all contacts for your location
+contacts://YOUR_LOCATION_ID
+
+# Get specific contact details  
+contact://YOUR_LOCATION_ID/YOUR_CONTACT_ID
+
+# Browse appointments for a contact
+appointments://YOUR_LOCATION_ID/YOUR_CONTACT_ID
+
+# Browse opportunities for your location
+opportunities://YOUR_LOCATION_ID
+
+# View conversation details
+conversation://YOUR_LOCATION_ID/YOUR_CONVERSATION_ID
+```
 
 ## Development
 
 ### Testing
 
-For local testing with real GoHighLevel accounts, create a `TESTING_INSTRUCTIONS.md` file in the project root with your specific testing accounts and guidelines. This file is gitignored and should not be committed to the repository.
+For local testing with real GoHighLevel accounts, you'll need:
+- A GoHighLevel account with API access
+- At least one sub-account (location) for testing
+- Test contacts and data in your GoHighLevel instance
+
+Create your own testing guidelines and keep sensitive data like location IDs and contact IDs in local files that are not committed to the repository.
 
 ### Running Tests
 
