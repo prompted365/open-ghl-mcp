@@ -173,8 +173,6 @@ class StandardModeSetup:
         print("Setting up in Custom Mode Authentication...")
         print("\n🔧 Custom Mode Setup")
         print("   • Use your own GoHighLevel Marketplace App")
-        print("   • Requires creating app in GHL Developer Portal")
-        print("   • Manual configuration with .env file")
         print("   • Full control over OAuth settings\n")
 
         # Automatically return custom mode for early release
@@ -192,10 +190,9 @@ class StandardModeSetup:
 
     async def interactive_custom_setup(self) -> bool:
         """Interactive setup for custom mode"""
-        print("\n🔧 Custom Mode Setup\n")
 
         # Ask if they have created their marketplace app
-        print("📋 GoHighLevel Marketplace App Required")
+        print("⚠️ GoHighLevel Marketplace App Required")
         print("   Custom mode requires your own GoHighLevel Marketplace App.\n")
 
         while True:
