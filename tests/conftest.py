@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import Mock, AsyncMock
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.models.auth import TokenResponse, LocationTokenResponse
 from src.models.contact import Contact
@@ -44,7 +44,7 @@ def mock_jwt_payload():
     return {
         "companyId": "mock_company_id",
         "userId": "mock_user_id",
-        "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+        "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
     }
 
 

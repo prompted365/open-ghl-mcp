@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 
 class TokenResponse(BaseModel):
@@ -38,7 +38,10 @@ class StoredToken(BaseModel):
     scope: str
     user_type: str
 
-    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+    @field_serializer("expires_at")
+    def serialize_expires_at(self, expires_at: datetime, _info):
+        """Serialize datetime to ISO format"""
+        return expires_at.isoformat()
 
     @classmethod
     def from_token_response(cls, response: TokenResponse) -> "StoredToken":

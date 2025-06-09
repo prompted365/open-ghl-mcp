@@ -1,7 +1,8 @@
 """Calendar and appointment management client for GoHighLevel API v2"""
 
-from typing import Optional
-from datetime import datetime, date
+from typing import Optional, Dict, Any
+from datetime import datetime, date, timedelta
+import pytz
 
 from .base import BaseGoHighLevelClient
 from ..models.calendar import (
@@ -18,6 +19,34 @@ from ..models.calendar import (
 
 class CalendarsClient(BaseGoHighLevelClient):
     """Client for calendar and appointment endpoints"""
+
+    @staticmethod
+    def format_datetime_with_timezone(
+        dt: datetime, timezone_name: str = "America/Chicago"
+    ) -> str:
+        """Helper to format datetime with proper timezone for GoHighLevel API
+
+        Args:
+            dt: Datetime object (can be naive or aware)
+            timezone_name: IANA timezone name (default: America/Chicago for Central Time)
+
+        Returns:
+            ISO format string with timezone offset (e.g., '2025-06-09T11:00:00-05:00')
+
+        Common timezones:
+        - 'America/Chicago' (Central)
+        - 'America/New_York' (Eastern)
+        - 'America/Los_Angeles' (Pacific)
+        - 'America/Denver' (Mountain)
+        """
+        tz = pytz.timezone(timezone_name)
+        if dt.tzinfo is None:
+            # Naive datetime - localize it
+            dt_aware = tz.localize(dt)
+        else:
+            # Already aware - convert to target timezone
+            dt_aware = dt.astimezone(tz)
+        return dt_aware.isoformat()
 
     # Appointment Methods
 
@@ -76,7 +105,26 @@ class CalendarsClient(BaseGoHighLevelClient):
             location_id=appointment.locationId,
         )
         data = response.json()
-        return Appointment(**data.get("appointment", data))
+
+        # The API returns a minimal response when creating appointments
+        # We need to merge it with the original request data to create a complete Appointment object
+        if "id" in data:
+            # Successful creation - merge the response with request data
+            complete_data = {
+                **appointment_data,  # Original request data
+                **data,  # Response data (overwrites any conflicts)
+                "locationId": appointment.locationId,  # Ensure locationId is present
+                "appointmentStatus": data.get(
+                    "appoinmentStatus",
+                    appointment_data.get("appointmentStatus", "confirmed"),
+                ),  # Handle typo in API
+            }
+            # Remove the misspelled field if present
+            complete_data.pop("appoinmentStatus", None)
+            return Appointment(**complete_data)
+        else:
+            # If no ID in response, just return what we got (error case)
+            return Appointment(**data.get("appointment", data))
 
     async def update_appointment(
         self, appointment_id: str, updates: AppointmentUpdate, location_id: str
@@ -143,25 +191,56 @@ class CalendarsClient(BaseGoHighLevelClient):
         timezone: Optional[str] = None,
     ) -> FreeSlotsResult:
         """Get available time slots for a calendar"""
-        params = {
-            "calendarId": calendar_id,
-            "startDate": start_date.isoformat(),
+        # Convert dates to millisecond timestamps
+        start_timestamp = int(
+            datetime.combine(start_date, datetime.min.time()).timestamp() * 1000
+        )
+
+        params: Dict[str, Any] = {
+            "startDate": start_timestamp,
         }
 
         if end_date:
-            params["endDate"] = end_date.isoformat()
+            end_timestamp = int(
+                datetime.combine(end_date, datetime.min.time()).timestamp() * 1000
+            )
+            params["endDate"] = end_timestamp
         if timezone:
             params["timezone"] = timezone
 
+        # Note: Do NOT include locationId in params - it uses the token's location
         response = await self._request(
             "GET",
             f"/calendars/{calendar_id}/free-slots",
             params=params,
-            location_id=location_id,
+            location_id=location_id,  # This is for token selection, not query params
         )
         data = response.json()
+
+        # The response format is different - it's organized by date
+        # Example: {"2025-06-10": {"slots": [...]}}
+        all_slots = []
+        for date_key, date_data in data.items():
+            if (
+                date_key != "traceId"
+                and isinstance(date_data, dict)
+                and "slots" in date_data
+            ):
+                for slot_time in date_data.get("slots", []):
+                    # Each slot is just a timestamp string like "2025-06-10T11:00:00-05:00"
+                    # We need to create start and end times (assuming 30-minute slots)
+                    slot_dt = datetime.fromisoformat(slot_time.replace("Z", "+00:00"))
+                    end_dt = slot_dt + timedelta(minutes=30)
+                    all_slots.append(
+                        FreeSlot(
+                            startTime=slot_time,
+                            endTime=end_dt.isoformat(),
+                            available=True,
+                        )
+                    )
+
         return FreeSlotsResult(
-            slots=[FreeSlot(**s) for s in data.get("slots", [])],
-            date=data.get("date", start_date.isoformat()),
-            timezone=data.get("timezone"),
+            slots=all_slots,
+            date=start_date.isoformat(),
+            timezone=timezone,
         )

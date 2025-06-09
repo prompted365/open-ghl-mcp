@@ -44,9 +44,13 @@ class AppointmentCreate(BaseModel):
     contactId: str = Field(
         ..., description="Contact ID associated with the appointment"
     )
-    startTime: Union[datetime, str] = Field(..., description="Appointment start time")
+    startTime: Union[datetime, str] = Field(
+        ...,
+        description="Appointment start time. Use timezone-aware ISO format (e.g., '2025-06-09T11:00:00-05:00' for Central Time) or datetime object",
+    )
     endTime: Optional[Union[datetime, str]] = Field(
-        None, description="Appointment end time"
+        None,
+        description="Appointment end time. Use timezone-aware ISO format (e.g., '2025-06-09T11:30:00-05:00' for Central Time) or datetime object",
     )
     title: Optional[str] = Field(None, description="Appointment title/subject")
     meetingLocationType: Optional[MeetingLocationType] = Field(

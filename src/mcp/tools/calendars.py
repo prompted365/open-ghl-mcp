@@ -51,7 +51,16 @@ def _register_calendar_tools(_mcp, _get_client):
 
     @mcp.tool()
     async def create_appointment(params: CreateAppointmentParams) -> Dict[str, Any]:
-        """Create a new appointment"""
+        """Create a new appointment
+
+        Important: Use timezone-aware ISO format for times to avoid 'slot no longer available' errors.
+        Examples:
+        - Central Time: '2025-06-09T11:00:00-05:00'
+        - Eastern Time: '2025-06-09T11:00:00-04:00'
+        - Pacific Time: '2025-06-09T11:00:00-07:00'
+
+        The times should match the timezone of the calendar's location.
+        """
         client = await get_client(params.access_token)
 
         # Parse ISO datetime strings
@@ -145,7 +154,18 @@ def _register_calendar_tools(_mcp, _get_client):
 
     @mcp.tool()
     async def get_free_slots(params: GetFreeSlotsParams) -> Dict[str, Any]:
-        """Get available time slots for a calendar"""
+        """Get available time slots for a calendar
+
+        Important: Always provide both start_date and end_date for best results.
+        Without end_date, the API may return limited or no available slots.
+
+        Example:
+        - start_date: '2025-06-09'
+        - end_date: '2025-06-09'  # Same day or later
+
+        The response will include slots in timezone-aware ISO format,
+        which you should use directly when creating appointments.
+        """
         client = await get_client(params.access_token)
 
         # Convert string dates to date objects

@@ -94,6 +94,7 @@ The MCP server follows a modular architecture:
    - Tests run on every push
 
 6. **Testing** (`tests/*`)
+   - IMPORTANT: If you need to change the auth configuration do not destroy a valid config. Instead, move it somewhere it can be moved back
    - Use the virtual environment when testing: `$ source .venv/bin/activate && python`
    - Put tests in the tests/ directory
    - Run all of the checks with the tests: `uv run black src/ tests/ && uv run flake8 src/ tests/ && uv run mypy src/ --ignore-missing-imports && uv run pytest`
@@ -459,6 +460,15 @@ The following scopes are required for calendar functionality:
 
 ### Datetime Handling
 The calendar API uses ISO 8601 datetime format with timezone information. The Pydantic models automatically handle conversion between ISO strings and Python datetime objects. Always provide timezone-aware datetimes for appointment scheduling to avoid conflicts.
+
+#### Important: Timezone Format for Appointments
+When creating appointments, the GoHighLevel API requires timezone-aware ISO format strings. Common formats:
+- **Central Time**: `2025-06-09T11:00:00-05:00` (CST) or `2025-06-09T11:00:00-06:00` (CDT)
+- **Eastern Time**: `2025-06-09T11:00:00-04:00` (EDT) or `2025-06-09T11:00:00-05:00` (EST)
+- **Pacific Time**: `2025-06-09T11:00:00-07:00` (PDT) or `2025-06-09T11:00:00-08:00` (PST)
+- **UTC**: `2025-06-09T16:00:00Z` or `2025-06-09T16:00:00+00:00`
+
+**Note**: When you get "slot no longer available" errors, check that your datetime format includes the timezone offset.
 
 ## Forms & Submissions System Implementation Guide
 

@@ -89,11 +89,13 @@ class TestOAuthServiceCustomMode:
         )
 
     @pytest.fixture
-    def oauth_service_custom(self, custom_settings):
+    def oauth_service_custom(self, custom_settings, tmp_path):
         """Create OAuth service instance in custom mode"""
         with patch("src.services.oauth.OAuthSettings", return_value=custom_settings):
             service = OAuthService()
             service.client = AsyncMock()  # Mock the HTTP client
+            # Ensure test uses temp path
+            service.settings.token_storage_path = str(tmp_path / "tokens.json")
             return service
 
     @pytest.fixture

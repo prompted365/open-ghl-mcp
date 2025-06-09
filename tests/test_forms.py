@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.models.form import (
     Form,
@@ -51,8 +51,8 @@ def sample_form():
                 options=["Google", "Facebook", "Referral", "Other"],
             ),
         ],
-        createdAt=datetime.utcnow(),
-        updatedAt=datetime.utcnow(),
+        createdAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
     )
 
 
@@ -70,7 +70,7 @@ def sample_submission():
             "email": "john@example.com",
             "custom_field_123": "Google",
         },
-        submittedAt=datetime.utcnow(),
+        submittedAt=datetime.now(timezone.utc),
     )
 
 
