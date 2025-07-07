@@ -4,7 +4,7 @@
 
 ## These are the related API docs:
 
-see @SUPABASE_TYPES.tsx for the generated types and the rest of the repo handles oAuth2 and Basic mcp with ghl. I believe we still need to add media and custom field support. 
+see @SUPABASE_TYPES.ts for the generated types and the rest of the repo handles oAuth2 and Basic mcp with ghl. I believe we still need to add media and custom field support. 
 
 Columns
 
